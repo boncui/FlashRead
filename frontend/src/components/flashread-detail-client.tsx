@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Flashread } from '@flashread/backend/types';
+import { Flashread } from '@flashread/dependencies/types';
 import { updateFlashread, deleteFlashread } from '@flashread/backend/actions/flashreads';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

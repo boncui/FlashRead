@@ -1,4 +1,5 @@
 packages:
+  - 'dependencies'
   - 'frontend'
   - 'backend'
   - 'agents'

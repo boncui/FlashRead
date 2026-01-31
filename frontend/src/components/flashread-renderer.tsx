@@ -1,4 +1,4 @@
-import { RenderedBlock } from '@flashread/backend/types';
+import { RenderedBlock } from '@flashread/dependencies/types';
 
 interface FlashreadRendererProps {
   blocks: RenderedBlock[];

@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FlashreadRenderer } from '@/components/flashread-renderer';
-import { RenderedBlock } from '@flashread/backend/types';
+import { RenderedBlock } from '@flashread/dependencies/types';
 
 export default function NewFlashreadPage() {
   const router = useRouter();

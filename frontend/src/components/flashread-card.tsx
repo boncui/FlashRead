@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Flashread } from '@flashread/backend/types';
+import { Flashread } from '@flashread/dependencies/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface FlashreadCardProps {

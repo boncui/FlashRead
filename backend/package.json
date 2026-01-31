@@ -18,6 +18,7 @@
     "build": "tsc --noEmit"
   },
   "dependencies": {
+    "@flashread/dependencies": "workspace:*",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.93.3",
     "next": "^15.1.6"
