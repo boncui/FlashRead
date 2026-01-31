@@ -1,0 +1,201 @@
+---
+description: FlashRead typography and layout standards (research-backed)
+globs: frontend/**/*.{tsx,css}
+alwaysApply: false
+---
+
+# FlashRead Typography & Layout Standards
+
+These rules are based on reading comprehension research and are treated as the BIBLE for all frontend design decisions in FlashRead.
+
+## Line Length (CPL - Characters Per Line)
+
+**ALWAYS constrain line length to ~55–65 characters:**
+
+```tsx
+// ✅ GOOD - Constrained line length
+<div className="max-w-[65ch]">
+  {content}
+</div>
+
+// ✅ GOOD - With responsive considerations
+<div className="max-w-[60ch] mx-auto">
+  {content}
+</div>
+
+// ❌ BAD - No line length constraint
+<div className="prose prose-slate max-w-none">
+  {content}
+</div>
+```
+
+**Target:** ~60 characters per line (responsive)
+
+## Font Size
+
+**Default to 16-18px, user-scalable:**
+
+```tsx
+// ✅ GOOD - Base to large text sizes
+<p className="text-base">...</p>  // 16px
+<p className="text-lg">...</p>     // 18px
+
+// ✅ GOOD - Respect user zoom/OS settings
+// Never disable user scaling in viewport meta
+
+// ❌ BAD - Too small
+<p className="text-sm">...</p>     // 14px is too small for body text
+```
+
+## Line Height
+
+**Use 1.4–1.5x font size (adjustable):**
+
+```tsx
+// ✅ GOOD - Comfortable line height
+<p className="leading-relaxed">...</p>  // 1.5
+<p className="leading-loose">...</p>    // 1.625
+
+// ✅ GOOD - Custom CSS variable for user control
+<p style={{ lineHeight: 'var(--reading-line-height, 1.5)' }}>...</p>
+
+// ❌ BAD - Too tight
+<p className="leading-tight">...</p>    // 1.25 is cramped
+```
+
+## Text Alignment
+
+**ALWAYS left-align, never justify:**
+
+```tsx
+// ✅ GOOD
+<p className="text-left">...</p>
+
+// ❌ BAD - Causes uneven word spacing
+<p className="text-justify">...</p>
+```
+
+## Letter & Word Spacing
+
+**Keep spacing normal (avoid crowding):**
+
+```tsx
+// ✅ GOOD - Default spacing
+<p>Normal text</p>
+
+// ❌ BAD - Increased spacing globally (slows fluent readers)
+<p className="tracking-wide">...</p>  // Don't do this by default
+
+// ⚠️ EXPERIMENT - Only as opt-in for specific users
+<p style={{ letterSpacing: 'var(--user-letter-spacing, normal)' }}>...</p>
+```
+
+## Content Chunking
+
+**1 idea per paragraph, generous whitespace:**
+
+```tsx
+// ✅ GOOD - Clear paragraph separation
+<p className="mb-4">First idea...</p>
+<p className="mb-4">Second idea...</p>
+
+// ✅ GOOD - Configurable spacing
+<p className="mb-[var(--paragraph-spacing,1rem)]">...</p>
+
+// ❌ BAD - Cramped spacing
+<p className="mb-1">...</p>
+```
+
+## Document Hierarchy
+
+**Preserve and strengthen structure:**
+
+```tsx
+// ✅ GOOD - Clear heading hierarchy
+<h1 className="text-3xl font-bold mb-6">Main Title</h1>
+<h2 className="text-2xl font-bold mt-8 mb-4">Section</h2>
+<h3 className="text-xl font-semibold mt-6 mb-3">Subsection</h3>
+
+// ✅ GOOD - Callout blocks
+<div className="border-l-4 border-blue-500 pl-4 my-4 bg-blue-50">
+  <p className="font-semibold text-sm uppercase text-blue-700">Definition</p>
+  <p>Content...</p>
+</div>
+
+// ✅ GOOD - Lists with proper spacing
+<ul className="list-disc list-inside space-y-2">
+  <li>Item one</li>
+  <li>Item two</li>
+</ul>
+```
+
+**Callout types to support:**
+- Definition
+- Key Result
+- Limitation
+- Assumption
+
+## User Controls (REQUIRED)
+
+**Every reading view MUST provide controls for:**
+
+```tsx
+// ✅ GOOD - User customization controls
+interface ReadingSettings {
+  charactersPerLine: 55 | 60 | 65;          // CPL control
+  fontSize: 16 | 17 | 18 | 19 | 20;         // Font size control
+  lineHeight: 1.4 | 1.5 | 1.6 | 1.7;        // Line height control
+  paragraphSpacing: 1 | 1.25 | 1.5 | 2;     // Spacing control
+  theme: 'light' | 'dark' | 'sepia';        // Theme control
+  fontFamily: 'system' | 'serif' | 'sans';  // Font choice
+}
+```
+
+## Theme Support
+
+**Provide light/dark/sepia themes with good contrast:**
+
+```css
+/* ✅ GOOD - Proper contrast ratios */
+.light { 
+  background: hsl(0 0% 100%);
+  color: hsl(222.2 84% 4.9%);
+}
+
+.dark {
+  background: hsl(222.2 84% 4.9%);
+  color: hsl(210 40% 98%);
+}
+
+.sepia {
+  background: hsl(40 40% 92%);
+  color: hsl(30 20% 20%);
+}
+
+/* ❌ BAD - Low contrast */
+.dark-bad {
+  background: hsl(0 0% 10%);
+  color: hsl(0 0% 30%);  /* Fails WCAG AA */
+}
+```
+
+## Reading Presets
+
+**Support preset configurations:**
+
+- **Balanced**: 60 CPL, 17px, 1.5 line height
+- **Speed**: 55 CPL, 16px, 1.4 line height
+- **Comprehension**: 65 CPL, 18px, 1.6 line height
+- **Fatigue**: 60 CPL, 18px, 1.7 line height
+
+Allow per-document overrides.
+
+## Optional Fatigue Helpers
+
+**Consider implementing (optional, not default):**
+
+- Break reminders (20-20-20 rule)
+- Session timer
+- "Blink break" prompts
+
+These should be OPT-IN and dismissible.
