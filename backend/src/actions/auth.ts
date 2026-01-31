@@ -58,3 +58,61 @@ export async function getCurrentUser() {
 
   return user;
 }
+
+export async function updateEmail(newEmail: string) {
+  const supabase = await createClient();
+
+  // Update email in Supabase Auth
+  const { error: authError } = await supabase.auth.updateUser({
+    email: newEmail,
+  });
+
+  if (authError) {
+    return { error: authError.message };
+  }
+
+  // Update email in profiles table
+  const { error: profileError } = await supabase
+    .from('profiles')
+    .update({ email: newEmail })
+    .eq('id', (await supabase.auth.getUser()).data.user?.id);
+
+  if (profileError) {
+    return { error: profileError.message };
+  }
+
+  revalidatePath('/', 'layout');
+  return { success: true };
+}
+
+export async function deleteAccount() {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  // Soft delete: mark profile as deleted
+  const { error: profileError } = await supabase
+    .from('profiles')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', user.id);
+
+  if (profileError) {
+    return { error: profileError.message };
+  }
+
+  // Sign out the user
+  const { error: signOutError } = await supabase.auth.signOut();
+
+  if (signOutError) {
+    return { error: signOutError.message };
+  }
+
+  revalidatePath('/', 'layout');
+  redirect('/login');
+}

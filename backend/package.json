@@ -8,16 +8,20 @@
     "./actions": "./src/actions/index.ts",
     "./actions/auth": "./src/actions/auth.ts",
     "./actions/flashreads": "./src/actions/flashreads.ts",
+    "./actions/documents": "./src/actions/documents.ts",
     "./types": "./src/lib/types.ts",
     "./supabase/client": "./src/lib/supabase/client.ts",
     "./supabase/server": "./src/lib/supabase/server.ts",
     "./supabase/middleware": "./src/lib/supabase/middleware.ts",
-    "./lib/flashread-formatter": "./src/lib/flashread-formatter.ts"
+    "./lib/flashread-formatter": "./src/lib/flashread-formatter.ts",
+    "./lib/r2/client": "./src/lib/r2/client.ts"
   },
   "scripts": {
     "build": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.716.0",
+    "@aws-sdk/s3-request-presigner": "^3.716.0",
     "@flashread/dependencies": "workspace:*",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.93.3",

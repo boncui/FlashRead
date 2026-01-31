@@ -14,11 +14,16 @@ export function Navbar() {
         <Link href="/app" className="text-2xl font-bold">
           FlashRead
         </Link>
-        <form action={handleSignOut}>
-          <Button type="submit" variant="ghost">
-            Sign Out
-          </Button>
-        </form>
+        <div className="flex items-center gap-4">
+          <Link href="/app/settings">
+            <Button variant="ghost">Settings</Button>
+          </Link>
+          <form action={handleSignOut}>
+            <Button type="submit" variant="ghost">
+              Sign Out
+            </Button>
+          </form>
+        </div>
       </div>
     </nav>
   );
