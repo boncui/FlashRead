@@ -1,0 +1,29 @@
+{
+  "name": "@flashread/backend",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    "./actions": "./src/actions/index.ts",
+    "./actions/auth": "./src/actions/auth.ts",
+    "./actions/flashreads": "./src/actions/flashreads.ts",
+    "./types": "./src/lib/types.ts",
+    "./supabase/client": "./src/lib/supabase/client.ts",
+    "./supabase/server": "./src/lib/supabase/server.ts",
+    "./supabase/middleware": "./src/lib/supabase/middleware.ts",
+    "./lib/flashread-formatter": "./src/lib/flashread-formatter.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.93.3",
+    "next": "^15.1.6"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "^5"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "flashread-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend",
+    "agents"
+  ],
+  "scripts": {
+    "dev": "pnpm --filter frontend dev",
+    "build": "pnpm --filter backend build && pnpm --filter frontend build",
+    "start": "pnpm --filter frontend start",
+    "lint": "pnpm --filter frontend lint",
+    "dev:frontend": "pnpm --filter frontend dev",
+    "dev:agents": "pnpm --filter agents dev"
+  },
+  "devDependencies": {
+    "typescript": "^5"
+  }
+}
