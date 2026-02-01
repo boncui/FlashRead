@@ -4,7 +4,7 @@ from typing import Optional
 from supabase import create_client, Client
 from .config import (
     SUPABASE_URL, 
-    SUPABASE_SERVICE_KEY,
+    SUPABASE_SERVICE_ROLE_KEY,
     R2_ACCOUNT_ID,
     R2_ACCESS_KEY_ID,
     R2_SECRET_ACCESS_KEY,
@@ -14,7 +14,7 @@ from .models import DocumentJob, OcrVersion
 
 
 # Initialize Supabase client
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 # Initialize R2 client
 r2_client = boto3.client(

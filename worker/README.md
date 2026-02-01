@@ -34,7 +34,7 @@ Create a `.env.local` file in the `worker/` directory:
 ```bash
 # Supabase
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_KEY=your-service-role-key-here
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
 
 # Cloudflare R2
 R2_ACCOUNT_ID=your-account-id
@@ -48,7 +48,7 @@ POLL_INTERVAL_SECONDS=5
 ```
 
 **Important Security Notes:**
-- The `SUPABASE_SERVICE_KEY` bypasses Row Level Security. Keep it secret!
+- The `SUPABASE_SERVICE_ROLE_KEY` bypasses Row Level Security. Keep it secret!
 - Never commit `.env` to version control
 
 ### 2. Database Migration

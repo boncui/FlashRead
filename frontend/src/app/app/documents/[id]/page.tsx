@@ -195,7 +195,7 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
                   <li>Direct text extraction attempts to read embedded text</li>
                   <li>Text is structured into pages and blocks</li>
                   <li>FlashRead format is generated for easy reading</li>
-                  <li>You'll be able to read it in the app</li>
+                  <li>You&apos;ll be able to read it in the app</li>
                 </ol>
               </div>
             </CardContent>

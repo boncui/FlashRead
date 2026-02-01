@@ -5,7 +5,7 @@ load_dotenv()
 
 # Supabase configuration
 SUPABASE_URL = os.getenv('SUPABASE_URL', '')
-SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY', '')
+SUPABASE_SERVICE_ROLE_KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY', '')
 
 # R2 configuration
 R2_ACCOUNT_ID = os.getenv('R2_ACCOUNT_ID', '')
@@ -30,7 +30,7 @@ def validate_config():
     """Ensure all required environment variables are set"""
     required_vars = {
         'SUPABASE_URL': SUPABASE_URL,
-        'SUPABASE_SERVICE_KEY': SUPABASE_SERVICE_KEY,
+        'SUPABASE_SERVICE_ROLE_KEY': SUPABASE_SERVICE_ROLE_KEY,
         'R2_ACCOUNT_ID': R2_ACCOUNT_ID,
         'R2_ACCESS_KEY_ID': R2_ACCESS_KEY_ID,
         'R2_SECRET_ACCESS_KEY': R2_SECRET_ACCESS_KEY,

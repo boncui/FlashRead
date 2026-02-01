@@ -12,10 +12,7 @@ import type { Flashread } from '@flashread/backend/types';
  * - Analyze reading patterns and suggest content
  */
 
-export async function exampleAgent() {
-  console.log('FlashRead AI Agents - Ready for implementation');
-  console.log('Import types from @flashread/backend to get started');
-  
+export async function exampleAgent(): Promise<Partial<Flashread>> {
   // Example: You can import and use backend types
   const exampleFlashread: Partial<Flashread> = {
     title: 'AI Generated FlashRead',
@@ -23,9 +20,4 @@ export async function exampleAgent() {
   };
   
   return exampleFlashread;
-}
-
-// Run if executed directly
-if (require.main === module) {
-  exampleAgent().then(console.log);
 }

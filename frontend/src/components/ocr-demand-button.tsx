@@ -105,8 +105,8 @@ export function OcrDemandButton({ documentId, documentName }: OcrDemandButtonPro
                   OCR text extraction for scanned documents is not available yet.
                 </p>
                 <p className="text-sm">
-                  We've noted your interest! This feature requires cloud infrastructure 
-                  that we're still setting up.
+                  We&apos;ve noted your interest! This feature requires cloud infrastructure 
+                  that we&apos;re still setting up.
                 </p>
               </div>
 

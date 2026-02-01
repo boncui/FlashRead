@@ -341,7 +341,7 @@ export function PdfUpload({ onUploadComplete, onExistingDocument, onTxtComplete 
                 Document already exists
               </p>
               <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                This PDF has already been uploaded as "{state.document.name}"
+                This PDF has already been uploaded as &quot;{state.document.name}&quot;
               </p>
             </div>
             <div className="flex gap-2">

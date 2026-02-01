@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { createServiceClient } from '../lib/supabase/service';
 import { createClient } from '../lib/supabase/server';
 import { OcrVersion } from '../lib/types';
+import { logger } from '../lib/logger';
 
 interface DocumentJob {
   id: string;
@@ -39,7 +40,7 @@ export async function enqueueExtractionJob(documentId: string): Promise<void> {
     .in('status', ['pending', 'processing']);
 
   if (existingJobs && existingJobs.length > 0) {
-    console.log(`Extraction job already exists for document ${documentId}, skipping enqueue`);
+    logger.info(`Extraction job already exists for document ${documentId}, skipping enqueue`);
     return;
   }
 
@@ -57,7 +58,7 @@ export async function enqueueExtractionJob(documentId: string): Promise<void> {
     throw new Error(`Failed to enqueue extraction job: ${error.message}`);
   }
 
-  console.log(`Enqueued extraction job for document ${documentId}`);
+  logger.info(`Enqueued extraction job for document ${documentId}`);
 }
 
 /**
@@ -79,7 +80,7 @@ export async function enqueueOcrJob(
     .in('status', ['pending', 'processing']);
 
   if (existingJobs && existingJobs.length > 0) {
-    console.log(`OCR job already exists for document ${documentId}, skipping enqueue`);
+    logger.info(`OCR job already exists for document ${documentId}, skipping enqueue`);
     return;
   }
 
@@ -98,7 +99,7 @@ export async function enqueueOcrJob(
     throw new Error(`Failed to enqueue OCR job: ${error.message}`);
   }
 
-  console.log(`Enqueued OCR job for document ${documentId}`);
+  logger.info(`Enqueued OCR job for document ${documentId}`);
 }
 
 /**
@@ -238,7 +239,7 @@ export async function completeJob(
   revalidatePath('/app/documents');
   revalidatePath(`/app/documents/${job.document_id}`);
 
-  console.log(`Completed job ${jobId} for document ${job.document_id} with status ${finalStatus}`);
+  logger.info(`Completed job ${jobId} for document ${job.document_id} with status ${finalStatus}`);
 }
 
 /**
@@ -293,7 +294,7 @@ export async function failJob(jobId: string, error: string): Promise<void> {
     revalidatePath(`/app/documents/${job.document_id}`);
   }
 
-  console.log(`Failed job ${jobId} (attempt ${newAttempts}/${job.max_attempts}): ${error}`);
+  logger.info(`Failed job ${jobId} (attempt ${newAttempts}/${job.max_attempts}): ${error}`);
 }
 
 /**
@@ -348,10 +349,10 @@ export async function logOcrDemand(
   });
 
   if (error) {
-    console.error('Failed to log OCR demand:', error.message);
+    logger.error('Failed to log OCR demand:', error.message);
     return { success: false, error: error.message };
   }
 
-  console.log(`Logged OCR demand signal: user=${user.id}, doc=${documentId}, clicks=${clickCount}`);
+  logger.info(`Logged OCR demand signal: user=${user.id}, doc=${documentId}, clicks=${clickCount}`);
   return { success: true };
 }

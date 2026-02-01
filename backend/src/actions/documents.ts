@@ -6,6 +6,7 @@ import { createClient } from '../lib/supabase/server';
 import { createServiceClient } from '../lib/supabase/service';
 import { Document, CreateDocumentInput, UpdateDocumentInput, OcrVersion, DerivedContent } from '../lib/types';
 import { generateUploadUrl, generateDownloadUrl, deleteObject, generateStorageKey } from '../lib/r2/client';
+import { logger } from '../lib/logger';
 
 /**
  * Get all documents for the authenticated user
@@ -186,7 +187,7 @@ export async function requestDocumentUpload(
       .eq('status', 'uploading');
     
     if (cleanupError) {
-      console.warn('[requestDocumentUpload] Failed to cleanup stuck uploads:', cleanupError.message);
+      logger.warn('[requestDocumentUpload] Failed to cleanup stuck uploads:', cleanupError.message);
       // Continue anyway - the new insert may succeed or fail with unique constraint
     }
   }
@@ -202,7 +203,7 @@ export async function requestDocumentUpload(
     .not('deleted_at', 'is', null);
 
   if (softDeleteCleanupError) {
-    console.warn('[requestDocumentUpload] Failed to cleanup soft-deleted docs:', softDeleteCleanupError.message);
+    logger.warn('[requestDocumentUpload] Failed to cleanup soft-deleted docs:', softDeleteCleanupError.message);
     // Continue anyway - the partial index should handle this if migration was applied
   }
 
@@ -428,7 +429,7 @@ export async function hardDeleteDocument(id: string): Promise<void> {
   try {
     await deleteObject(document.storage_key);
   } catch (error) {
-    console.error('Failed to delete from R2:', error);
+    logger.error('Failed to delete from R2:', error);
     // Continue with database deletion even if R2 delete fails
   }
 
