@@ -76,6 +76,24 @@ export interface RsvpTimingConfig {
   minDurationFloor: number;
   /** Maximum duration multiplier cap (default 4.0) */
   maxDurationCap: number;
+  
+  // === ADAPTIVE FLOW TIMING ===
+  
+  /** Enable adaptive pacing where WPM becomes target average (default false for gradual rollout) */
+  enableAdaptivePacing: boolean;
+  /** Maximum variance from target WPM as fraction (default 0.20 = ±20%) */
+  targetWpmVariance: number;
+  /** Number of words to track for rolling average (default 25) */
+  averageWindowSize: number;
+  
+  /** Enable momentum building on easy word sequences (default true) */
+  enableMomentum: boolean;
+  /** Number of easy words before momentum kicks in (default 3) */
+  momentumBuildThreshold: number;
+  /** Maximum speed boost from momentum as fraction (default 0.15 = 15% faster) */
+  momentumMaxBoost: number;
+  /** How fast momentum decays on complex words (default 0.5 = 50% decay) */
+  momentumDecayRate: number;
 }
 
 /**
@@ -95,6 +113,25 @@ export interface WpmRampState {
   rampStartTime: number;
   /** Duration of the ramp in ms */
   rampDuration: number;
+}
+
+/**
+ * Flow state for adaptive timing - tracks momentum and rolling average
+ */
+export interface FlowState {
+  // Momentum tracking
+  /** Number of consecutive easy words encountered */
+  consecutiveEasyWords: number;
+  /** Current momentum multiplier (1.0 = neutral, 0.85 = 15% faster) */
+  currentMomentum: number;
+  
+  // Average correction tracking
+  /** Sliding window of recent actual durations (ms) */
+  recentDurations: number[];
+  /** Sliding window of recent target base durations (ms) */
+  recentTargetDurations: number[];
+  /** Current average deviation from target (positive = too slow, negative = too fast) */
+  averageDeviation: number;
 }
 
 /**
@@ -163,6 +200,15 @@ export const DEFAULT_TIMING_CONFIG: RsvpTimingConfig = {
   denseContentReliefInterval: 12, // Seconds before micro-rest
   minDurationFloor: 0.4,          // Min 40% of base interval
   maxDurationCap: 4.0,            // Max 4x base interval
+  
+  // Adaptive flow timing options
+  enableAdaptivePacing: false,    // Disabled by default for gradual rollout
+  targetWpmVariance: 0.20,        // ±20% variance from target WPM
+  averageWindowSize: 25,          // Track 25 words for rolling average
+  enableMomentum: true,           // Enable momentum building
+  momentumBuildThreshold: 3,      // 3 easy words before momentum kicks in
+  momentumMaxBoost: 0.15,         // Max 15% speed boost
+  momentumDecayRate: 0.5,         // 50% momentum decay on complex words
 };
 
 /**
@@ -638,457 +684,203 @@ export function getBoundaryPause(
   return Math.min(baseInterval * multiplier, baseInterval * maxPause);
 }
 
-/**
- * Telemetry data collected by the scheduler for performance analysis.
- */
-export interface SchedulerTelemetry {
-  /** Frame-to-frame time deviation from expected 16.67ms (ms) */
-  frameJitter: number[];
-  /** Count of tokens displayed later than expected (>50ms late) */
-  deadlineMisses: number;
-  /** Actual WPM achieved, sampled every 10 tokens */
-  effectiveWpmSamples: number[];
-  /** Times we advanced more than 1 token per frame (catch-up events) */
-  catchupEvents: number;
-  /** Start time for session duration calculation */
-  sessionStartTime: number;
-  /** Total tokens displayed */
-  tokensDisplayed: number;
-}
-
-/** Maximum tokens to catch up in a single frame to prevent freezing */
-const MAX_CATCHUP_TOKENS = 10;
+// ==================== ADAPTIVE FLOW TIMING ====================
 
 /**
- * RSVP Scheduler - handles timing for word display
+ * Calculate momentum multiplier based on consecutive easy words.
+ * Momentum reduces duration (speeds up reading) during easy sequences.
  * 
- * Features:
- * - Monotonic clock to prevent drift
- * - Visibility change handling (auto-pause when tab hidden)
- * - Multi-token catch-up when returning from background
- * - Optional telemetry instrumentation
+ * @param consecutiveEasyWords - Number of easy words in current streak
+ * @param config - Timing configuration
+ * @returns Multiplier (1.0 = neutral, 0.85 = 15% faster)
  */
-export class RsvpScheduler {
-  private tokens: RsvpToken[];
-  private config: RsvpTimingConfig;
-  private currentIndex: number = 0;
-  private isRunning: boolean = false;
-  private startTime: number = 0;
-  private accumulatedTime: number = 0;
-  private animationFrameId: number | null = null;
-  private onTick: (index: number, token: RsvpToken) => void;
-  private onComplete: () => void;
-  
-  // Visibility handling
-  private isHidden: boolean = false;
-  private pausedByVisibility: boolean = false;
-  private visibilityHandler: (() => void) | null = null;
-  
-  // Telemetry
-  private telemetry: SchedulerTelemetry | null = null;
-  private lastFrameTime: number = 0;
-  private lastTelemetryIndex: number = 0;
-  private lastTelemetryTime: number = 0;
-  
-  // WPM ramping
-  private wpmRamp: WpmRampState | null = null;
-  
-  constructor(
-    tokens: RsvpToken[],
-    config: RsvpTimingConfig,
-    onTick: (index: number, token: RsvpToken) => void,
-    onComplete: () => void
-  ) {
-    this.tokens = tokens;
-    this.config = config;
-    this.onTick = onTick;
-    this.onComplete = onComplete;
-    
-    // Set up visibility change handling
-    this.setupVisibilityHandling();
+export function calculateMomentumMultiplier(
+  consecutiveEasyWords: number,
+  config: RsvpTimingConfig
+): number {
+  if (!config.enableMomentum) {
+    return 1.0;
   }
   
-  /**
-   * Set up visibility change listener to auto-pause/resume on tab switch.
-   */
-  private setupVisibilityHandling(): void {
-    if (typeof document === 'undefined') return;
-    
-    this.visibilityHandler = () => {
-      if (document.visibilityState === 'hidden') {
-        this.isHidden = true;
-        if (this.isRunning) {
-          this.pausedByVisibility = true;
-          this.pause();
-        }
-      } else {
-        this.isHidden = false;
-        if (this.pausedByVisibility) {
-          this.pausedByVisibility = false;
-          this.start();
-        }
-      }
-    };
-    
-    document.addEventListener('visibilitychange', this.visibilityHandler);
+  // No momentum until threshold is met
+  if (consecutiveEasyWords < config.momentumBuildThreshold) {
+    return 1.0;
   }
   
-  /**
-   * Enable telemetry collection for performance analysis.
-   */
-  enableTelemetry(): void {
-    this.telemetry = {
-      frameJitter: [],
-      deadlineMisses: 0,
-      effectiveWpmSamples: [],
-      catchupEvents: 0,
-      sessionStartTime: performance.now(),
-      tokensDisplayed: 0,
-    };
-    this.lastFrameTime = 0;
-    this.lastTelemetryIndex = 0;
-    this.lastTelemetryTime = 0;
+  // Linear momentum build from threshold to max
+  const excessWords = consecutiveEasyWords - config.momentumBuildThreshold;
+  const momentumProgress = Math.min(1.0, excessWords / 5); // Ramp over 5 words
+  const speedBoost = momentumProgress * config.momentumMaxBoost;
+  
+  // Return multiplier: 1.0 (no boost) down to (1.0 - maxBoost) (full boost)
+  return 1.0 - speedBoost;
+}
+
+/**
+ * Update flow state based on current token.
+ * Handles momentum building, decay, and resetting.
+ * 
+ * @param flowState - Current flow state (mutated in place)
+ * @param token - Current token
+ * @param config - Timing configuration
+ */
+export function updateFlowMomentum(
+  flowState: FlowState,
+  token: RsvpToken,
+  config: RsvpTimingConfig
+): void {
+  if (!config.enableMomentum) {
+    flowState.consecutiveEasyWords = 0;
+    flowState.currentMomentum = 1.0;
+    return;
   }
   
-  /**
-   * Get collected telemetry data.
-   */
-  getTelemetry(): SchedulerTelemetry | null {
-    return this.telemetry;
+  // Paragraph breaks reset momentum completely
+  if (token.isParagraphBreak) {
+    flowState.consecutiveEasyWords = 0;
+    flowState.currentMomentum = 1.0;
+    return;
   }
   
-  /**
-   * Get telemetry summary with computed statistics.
-   */
-  getTelemetrySummary(): {
-    p50Jitter: number;
-    p95Jitter: number;
-    p99Jitter: number;
-    deadlineMisses: number;
-    catchupEvents: number;
-    avgEffectiveWpm: number;
-    tokensDisplayed: number;
-    sessionDuration: number;
-  } | null {
-    if (!this.telemetry) return null;
-    
-    const jitter = [...this.telemetry.frameJitter].sort((a, b) => a - b);
-    const p50 = jitter[Math.floor(jitter.length * 0.5)] || 0;
-    const p95 = jitter[Math.floor(jitter.length * 0.95)] || 0;
-    const p99 = jitter[Math.floor(jitter.length * 0.99)] || 0;
-    
-    const avgWpm = this.telemetry.effectiveWpmSamples.length > 0
-      ? this.telemetry.effectiveWpmSamples.reduce((a, b) => a + b, 0) / this.telemetry.effectiveWpmSamples.length
-      : 0;
-    
-    return {
-      p50Jitter: p50,
-      p95Jitter: p95,
-      p99Jitter: p99,
-      deadlineMisses: this.telemetry.deadlineMisses,
-      catchupEvents: this.telemetry.catchupEvents,
-      avgEffectiveWpm: avgWpm,
-      tokensDisplayed: this.telemetry.tokensDisplayed,
-      sessionDuration: performance.now() - this.telemetry.sessionStartTime,
-    };
-  }
-  
-  /**
-   * Record telemetry for current frame.
-   */
-  private recordTelemetry(elapsed: number, expectedTime: number, catchupCount: number): void {
-    if (!this.telemetry) return;
-    
-    const now = performance.now();
-    
-    // Record frame jitter
-    if (this.lastFrameTime > 0) {
-      const frameDelta = now - this.lastFrameTime;
-      const expectedDelta = 16.67; // 60fps
-      this.telemetry.frameJitter.push(Math.abs(frameDelta - expectedDelta));
-      
-      // Keep array from growing unbounded (keep last 1000 samples)
-      if (this.telemetry.frameJitter.length > 1000) {
-        this.telemetry.frameJitter.shift();
-      }
-    }
-    this.lastFrameTime = now;
-    
-    // Record deadline misses (>50ms late)
-    if (elapsed > expectedTime + 50) {
-      this.telemetry.deadlineMisses++;
-    }
-    
-    // Record catch-up events
-    if (catchupCount > 1) {
-      this.telemetry.catchupEvents++;
-    }
-    
-    // Record effective WPM every 10 tokens
-    this.telemetry.tokensDisplayed++;
-    if (this.currentIndex - this.lastTelemetryIndex >= 10) {
-      const timeDelta = now - this.lastTelemetryTime;
-      if (timeDelta > 0 && this.lastTelemetryTime > 0) {
-        const tokensDelta = this.currentIndex - this.lastTelemetryIndex;
-        const effectiveWpm = (tokensDelta / timeDelta) * 60_000;
-        this.telemetry.effectiveWpmSamples.push(effectiveWpm);
-      }
-      this.lastTelemetryIndex = this.currentIndex;
-      this.lastTelemetryTime = now;
+  // Easy word: build momentum
+  if (token.isEasyWord) {
+    flowState.consecutiveEasyWords++;
+    flowState.currentMomentum = calculateMomentumMultiplier(
+      flowState.consecutiveEasyWords,
+      config
+    );
+  } else {
+    // Complex word: decay momentum
+    if (flowState.consecutiveEasyWords > 0) {
+      // Apply decay rate
+      flowState.consecutiveEasyWords = Math.floor(
+        flowState.consecutiveEasyWords * (1 - config.momentumDecayRate)
+      );
+      flowState.currentMomentum = calculateMomentumMultiplier(
+        flowState.consecutiveEasyWords,
+        config
+      );
     }
   }
   
-  /**
-   * Start or resume playback.
-   */
-  start(): void {
-    if (this.isRunning) return;
-    if (this.isHidden) return; // Don't start if tab is hidden
-    
-    if (this.currentIndex >= this.tokens.length) {
-      this.currentIndex = 0;
-      this.accumulatedTime = 0;
-    }
-    
-    this.isRunning = true;
-    this.startTime = performance.now() - this.accumulatedTime;
-    
-    // Initialize telemetry timing if enabled
-    if (this.telemetry && this.lastTelemetryTime === 0) {
-      this.lastTelemetryTime = performance.now();
-      this.lastTelemetryIndex = this.currentIndex;
-    }
-    
-    this.scheduleNextTick();
-  }
-  
-  /**
-   * Pause playback.
-   */
-  pause(): void {
-    if (!this.isRunning) return;
-    
-    this.isRunning = false;
-    this.accumulatedTime = performance.now() - this.startTime;
-    
-    if (this.animationFrameId !== null) {
-      cancelAnimationFrame(this.animationFrameId);
-      this.animationFrameId = null;
-    }
-  }
-  
-  /**
-   * Stop and reset to beginning.
-   */
-  stop(): void {
-    this.pause();
-    this.currentIndex = 0;
-    this.accumulatedTime = 0;
-  }
-  
-  /**
-   * Jump to a specific token index.
-   */
-  jumpTo(index: number): void {
-    const wasRunning = this.isRunning;
-    this.pause();
-    
-    this.currentIndex = Math.max(0, Math.min(index, this.tokens.length - 1));
-    this.accumulatedTime = this.calculateTimeToIndex(this.currentIndex);
-    
-    if (this.tokens[this.currentIndex]) {
-      this.onTick(this.currentIndex, this.tokens[this.currentIndex]);
-    }
-    
-    if (wasRunning) {
-      this.start();
-    }
-  }
-  
-  /**
-   * Update WPM on the fly with optional smooth ramping.
-   */
-  updateConfig(config: Partial<RsvpTimingConfig>): void {
-    // Check if WPM is changing and smooth ramp is enabled
-    if (
-      config.wpm !== undefined && 
-      config.wpm !== this.config.wpm && 
-      this.config.enableSmoothWpmRamp &&
-      this.isRunning
-    ) {
-      // Start smooth ramp instead of instant change
-      this.wpmRamp = {
-        targetWpm: config.wpm,
-        startWpm: this.getEffectiveWpm(),
-        rampStartTime: performance.now(),
-        rampDuration: this.config.wpmRampDuration,
-      };
-      
-      // Update config but don't pause - ramp handles the transition
-      this.config = { ...this.config, ...config };
-      return;
-    }
-    
-    // For non-WPM changes or when smooth ramp is disabled, use old behavior
-    const wasRunning = this.isRunning;
-    if (wasRunning) this.pause();
-    
-    this.config = { ...this.config, ...config };
-    
-    // Clear any active ramp when WPM changes without ramping
-    if (config.wpm !== undefined) {
-      this.wpmRamp = null;
-    }
-    
-    // Recalculate accumulated time for current position
-    this.accumulatedTime = this.calculateTimeToIndex(this.currentIndex);
-    
-    if (wasRunning) this.start();
-  }
-  
-  /**
-   * Get the current effective WPM, accounting for any active ramp.
-   */
-  getEffectiveWpm(): number {
-    if (!this.wpmRamp) return this.config.wpm;
-    
-    const now = performance.now();
-    const elapsed = now - this.wpmRamp.rampStartTime;
-    const t = Math.min(1, elapsed / this.wpmRamp.rampDuration);
-    
-    // Ease-out cubic: fast start, gentle end
-    // f(t) = 1 - (1-t)^3
-    const eased = 1 - Math.pow(1 - t, 3);
-    
-    const currentWpm = this.wpmRamp.startWpm + 
-      (this.wpmRamp.targetWpm - this.wpmRamp.startWpm) * eased;
-    
-    // Clear ramp when complete
-    if (t >= 1) {
-      this.wpmRamp = null;
-    }
-    
-    return currentWpm;
-  }
-  
-  /**
-   * Check if a WPM ramp is currently active.
-   */
-  isRamping(): boolean {
-    return this.wpmRamp !== null;
-  }
-  
-  /**
-   * Get current timing config, with effective WPM if ramping.
-   */
-  private getCurrentConfig(): RsvpTimingConfig {
-    return {
-      ...this.config,
-      wpm: this.getEffectiveWpm(),
-    };
-  }
-  
-  /**
-   * Get current state.
-   */
-  getState(): { index: number; isRunning: boolean; progress: number; isPausedByVisibility: boolean } {
-    return {
-      index: this.currentIndex,
-      isRunning: this.isRunning,
-      progress: this.tokens.length > 0 
-        ? (this.currentIndex / this.tokens.length) * 100 
-        : 0,
-      isPausedByVisibility: this.pausedByVisibility,
-    };
-  }
-  
-  /**
-   * Check if currently paused due to tab visibility.
-   */
-  isPausedByVisibility(): boolean {
-    return this.pausedByVisibility;
-  }
-  
-  /**
-   * Cleanup resources.
-   */
-  destroy(): void {
-    this.pause();
-    this.tokens = [];
-    
-    // Remove visibility listener
-    if (this.visibilityHandler && typeof document !== 'undefined') {
-      document.removeEventListener('visibilitychange', this.visibilityHandler);
-      this.visibilityHandler = null;
-    }
-  }
-  
-  private calculateTimeToIndex(targetIndex: number): number {
-    let time = 0;
-    for (let i = 0; i < targetIndex && i < this.tokens.length; i++) {
-      time += getTokenDuration(this.tokens[i], this.config);
-    }
-    return time;
-  }
-  
-  private scheduleNextTick(): void {
-    if (!this.isRunning) return;
-    
-    this.animationFrameId = requestAnimationFrame(() => {
-      if (!this.isRunning) return;
-      
-      const elapsed = performance.now() - this.startTime;
-      
-      // Use effective config which accounts for WPM ramping
-      const effectiveConfig = this.getCurrentConfig();
-      let timeAtCurrentIndex = this.calculateTimeToIndexWithConfig(this.currentIndex, effectiveConfig);
-      
-      // Allow catching up multiple tokens (e.g., after returning from background tab)
-      // but cap to prevent UI freeze
-      let catchupCount = 0;
-      
-      while (catchupCount < MAX_CATCHUP_TOKENS && this.currentIndex < this.tokens.length - 1) {
-        const tokenDuration = getTokenDuration(this.tokens[this.currentIndex], effectiveConfig);
-        const timeAtNextIndex = timeAtCurrentIndex + tokenDuration;
-        
-        if (elapsed < timeAtNextIndex) break;
-        
-        this.currentIndex++;
-        timeAtCurrentIndex = timeAtNextIndex;
-        catchupCount++;
-      }
-      
-      // Fire tick for current position
-      if (this.tokens[this.currentIndex]) {
-        this.onTick(this.currentIndex, this.tokens[this.currentIndex]);
-      }
-      
-      // Record telemetry if enabled
-      this.recordTelemetry(elapsed, timeAtCurrentIndex, catchupCount);
-      
-      // Check for completion
-      if (this.currentIndex >= this.tokens.length - 1) {
-        const finalDuration = getTokenDuration(this.tokens[this.currentIndex], effectiveConfig);
-        if (elapsed >= timeAtCurrentIndex + finalDuration) {
-          this.isRunning = false;
-          this.onComplete();
-          return;
-        }
-      }
-      
-      // Schedule next frame
-      this.scheduleNextTick();
-    });
-  }
-  
-  /**
-   * Calculate time to index using a specific config (for ramping support).
-   */
-  private calculateTimeToIndexWithConfig(targetIndex: number, config: RsvpTimingConfig): number {
-    let time = 0;
-    for (let i = 0; i < targetIndex && i < this.tokens.length; i++) {
-      time += getTokenDuration(this.tokens[i], config);
-    }
-    return time;
+  // Phrase boundaries also reset momentum (natural pause point)
+  if (token.isPhraseBoundary || token.isSentenceEnd) {
+    flowState.consecutiveEasyWords = 0;
+    flowState.currentMomentum = 1.0;
   }
 }
+
+/**
+ * Update rolling average tracker with a new duration.
+ * Maintains a sliding window of recent durations for average correction.
+ * 
+ * @param flowState - Current flow state (mutated in place)
+ * @param actualDuration - Actual duration used for this token (ms)
+ * @param targetDuration - Target base duration before flow adjustments (ms)
+ * @param config - Timing configuration
+ */
+export function updateRollingAverage(
+  flowState: FlowState,
+  actualDuration: number,
+  targetDuration: number,
+  config: RsvpTimingConfig
+): void {
+  // Add to sliding windows
+  flowState.recentDurations.push(actualDuration);
+  flowState.recentTargetDurations.push(targetDuration);
+  
+  // Keep window size limited
+  const maxSize = config.averageWindowSize;
+  if (flowState.recentDurations.length > maxSize) {
+    flowState.recentDurations.shift();
+    flowState.recentTargetDurations.shift();
+  }
+  
+  // Calculate average deviation if we have enough samples (at least 5)
+  if (flowState.recentDurations.length >= 5) {
+    const totalActual = flowState.recentDurations.reduce((sum, d) => sum + d, 0);
+    const totalTarget = flowState.recentTargetDurations.reduce((sum, d) => sum + d, 0);
+    
+    const avgActual = totalActual / flowState.recentDurations.length;
+    const avgTarget = totalTarget / flowState.recentTargetDurations.length;
+    
+    // Deviation: positive means we're going slower than target, negative means faster
+    flowState.averageDeviation = (avgActual - avgTarget) / avgTarget;
+  } else {
+    flowState.averageDeviation = 0;
+  }
+}
+
+/**
+ * Calculate average correction factor to drift toward target WPM.
+ * Returns a multiplier to apply to duration: <1.0 speeds up, >1.0 slows down.
+ * 
+ * @param flowState - Current flow state
+ * @param config - Timing configuration
+ * @returns Correction multiplier (typically 0.95 - 1.05)
+ */
+export function calculateAverageCorrection(
+  flowState: FlowState,
+  config: RsvpTimingConfig
+): number {
+  if (!config.enableAdaptivePacing) {
+    return 1.0;
+  }
+  
+  // No correction if not enough samples yet
+  if (flowState.recentDurations.length < 5) {
+    return 1.0;
+  }
+  
+  // Apply gentle correction: 2-5% adjustment based on deviation
+  // If deviation is positive (too slow), multiply by <1.0 to speed up
+  // If deviation is negative (too fast), multiply by >1.0 to slow down
+  const correctionStrength = 0.1; // 10% of deviation is applied
+  const correction = 1.0 - (flowState.averageDeviation * correctionStrength);
+  
+  // Clamp correction to prevent extreme changes (0.95 - 1.05 = ±5%)
+  return Math.max(0.95, Math.min(1.05, correction));
+}
+
+/**
+ * Calculate flow-adjusted duration for a token.
+ * Applies momentum and average correction on top of base duration.
+ * 
+ * @param baseDuration - Base duration from cadence model (ms)
+ * @param token - Current token
+ * @param flowState - Current flow state (or null if disabled)
+ * @param config - Timing configuration
+ * @returns Adjusted duration (ms)
+ */
+export function getFlowAdjustedDuration(
+  baseDuration: number,
+  token: RsvpToken,
+  flowState: FlowState | null,
+  config: RsvpTimingConfig
+): number {
+  // If adaptive pacing disabled or no flow state, return base duration
+  if (!config.enableAdaptivePacing || !flowState) {
+    return baseDuration;
+  }
+  
+  // Start with base duration
+  let adjustedDuration = baseDuration;
+  
+  // Apply momentum multiplier (speeds up during easy sequences)
+  if (config.enableMomentum) {
+    adjustedDuration *= flowState.currentMomentum;
+  }
+  
+  // Apply average correction factor (keeps overall average near target)
+  const correctionFactor = calculateAverageCorrection(flowState, config);
+  adjustedDuration *= correctionFactor;
+  
+  // Enforce variance bounds to prevent extreme deviations
+  const baseInterval = getBaseInterval(config.wpm);
+  const minDuration = baseInterval * (1 - config.targetWpmVariance);
+  const maxDuration = baseInterval * (1 + config.targetWpmVariance) * 3; // Allow 3x for pauses
+  adjustedDuration = Math.max(minDuration, Math.min(maxDuration, adjustedDuration));
+  
+  return adjustedDuration;
+}
+

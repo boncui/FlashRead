@@ -10,17 +10,19 @@ import {
 import { cn } from '@/lib/utils';
 import { useGearClick } from '@/hooks/use-gear-click';
 import { useReadingProgress } from '@/hooks/use-reading-progress';
+import { useRsvpSettings } from '@/hooks/use-rsvp-settings';
 import { tokenize, blocksToText, getWordCount, createTokenBlockMapping, type RsvpToken } from './rsvpTokenizer';
 import { splitTokenForOrp, getOrpCenterOffset } from './orp';
 import {
-  RsvpScheduler,
   DEFAULT_TIMING_CONFIG,
   type RsvpTimingConfig,
   getEstimatedDuration,
   formatDuration,
 } from './timing';
+import { RsvpScheduler } from './scheduler';
 import { filterBlocks, filterText } from '@/lib/content-filter';
 import { SyncedTextPanel } from './SyncedTextPanel';
+import { RsvpControlsPanel } from './RsvpControlsPanel';
 
 export interface RsvpPlayerProps {
   /** Source text to display */
@@ -98,25 +100,40 @@ export function RsvpPlayer({
     saveNow,
   } = useReadingProgress({ documentId, tokens });
 
+  // RSVP settings persistence (per-user)
+  const {
+    config: savedConfig,
+    isLoaded: settingsLoaded,
+    isDirty: isSettingsDirty,
+    isSaving: isSettingsSaving,
+    updateConfig: updateSavedConfig,
+    applyPreset,
+    resetToFactory,
+    saveNow: saveSettingsNow,
+  } = useRsvpSettings();
+
   // State - initialize from saved progress once loaded
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [wpm, setWpm] = useState(initialWpm);
   const [hasInitialized, setHasInitialized] = useState(false);
 
-  // Initialize from saved progress once loaded
+  // Initialize from saved progress and settings once loaded
   useEffect(() => {
-    if (progressLoaded && !hasInitialized) {
+    if (progressLoaded && settingsLoaded && !hasInitialized) {
       if (initialIndex > 0) {
         setCurrentIndex(initialIndex);
         schedulerRef.current?.jumpTo(initialIndex);
       }
-      if (savedWpm) {
+      // Use saved settings WPM, then document progress WPM, then initialWpm prop
+      if (savedConfig.wpm) {
+        setWpm(savedConfig.wpm);
+      } else if (savedWpm) {
         setWpm(savedWpm);
       }
       setHasInitialized(true);
     }
-  }, [progressLoaded, hasInitialized, initialIndex, savedWpm]);
+  }, [progressLoaded, settingsLoaded, hasInitialized, initialIndex, savedWpm, savedConfig.wpm]);
 
   // Auto-save progress when currentIndex changes
   useEffect(() => {
@@ -127,6 +144,7 @@ export function RsvpPlayer({
   const [showControls, setShowControls] = useState(true);
   const [showWarning, setShowWarning] = useState(false);
   const [showTextPanel, setShowTextPanel] = useState(false);
+  const [showSettingsPanel, setShowSettingsPanel] = useState(false);
 
   // WPM change indicator
   const [showWpmIndicator, setShowWpmIndicator] = useState(false);
@@ -157,14 +175,14 @@ export function RsvpPlayer({
   // Gear click sound
   const playClick = useGearClick({ volume: 0.2 });
 
-  // Timing config
+  // Timing config - uses saved settings, with local wpm override for responsiveness
   const timingConfig = useMemo<RsvpTimingConfig>(
     () => ({
-      ...DEFAULT_TIMING_CONFIG,
-      wpm,
-      ...initialConfig,
+      ...savedConfig,
+      wpm, // Local wpm state for responsive adjustments
+      ...initialConfig, // Allow props to override
     }),
-    [wpm, initialConfig]
+    [savedConfig, wpm, initialConfig]
   );
 
   // Current token
@@ -283,6 +301,8 @@ export function RsvpPlayer({
   const adjustWpm = useCallback((delta: number) => {
     setWpm((prev) => {
       const newWpm = Math.max(MIN_WPM, Math.min(MAX_WPM, prev + delta));
+      // Also update saved settings (debounced)
+      updateSavedConfig('wpm', newWpm);
       return newWpm;
     });
     
@@ -294,7 +314,7 @@ export function RsvpPlayer({
     wpmIndicatorTimeoutRef.current = setTimeout(() => {
       setShowWpmIndicator(false);
     }, 1200);
-  }, []);
+  }, [updateSavedConfig]);
 
   const handleStop = useCallback(() => {
     setIsPlaying(false);
@@ -390,6 +410,10 @@ export function RsvpPlayer({
           e.preventDefault();
           setShowTextPanel((p) => !p);
           break;
+        case 'KeyS':
+          e.preventDefault();
+          setShowSettingsPanel((p) => !p);
+          break;
       }
     };
 
@@ -464,7 +488,8 @@ export function RsvpPlayer({
     const deltaWpm = Math.round(deltaX * 2);
     const newWpm = Math.max(MIN_WPM, Math.min(MAX_WPM, wpmDragRef.current.startWpm + deltaWpm));
     setWpm(newWpm);
-  }, []);
+    updateSavedConfig('wpm', newWpm);
+  }, [updateSavedConfig]);
 
   const handleWpmPointerUp = useCallback((e: React.PointerEvent) => {
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
@@ -492,22 +517,26 @@ export function RsvpPlayer({
       e.preventDefault();
       const parsed = parseInt(editWpmValue, 10);
       if (!isNaN(parsed)) {
-        setWpm(Math.max(MIN_WPM, Math.min(MAX_WPM, parsed)));
+        const newWpm = Math.max(MIN_WPM, Math.min(MAX_WPM, parsed));
+        setWpm(newWpm);
+        updateSavedConfig('wpm', newWpm);
       }
       setIsEditingWpm(false);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       setIsEditingWpm(false);
     }
-  }, [editWpmValue]);
+  }, [editWpmValue, updateSavedConfig]);
 
   const handleWpmInputBlur = useCallback(() => {
     const parsed = parseInt(editWpmValue, 10);
     if (!isNaN(parsed)) {
-      setWpm(Math.max(MIN_WPM, Math.min(MAX_WPM, parsed)));
+      const newWpm = Math.max(MIN_WPM, Math.min(MAX_WPM, parsed));
+      setWpm(newWpm);
+      updateSavedConfig('wpm', newWpm);
     }
     setIsEditingWpm(false);
-  }, [editWpmValue]);
+  }, [editWpmValue, updateSavedConfig]);
 
   // Save settings on unmount or config change
   useEffect(() => {
@@ -532,13 +561,13 @@ export function RsvpPlayer({
     };
   }, []);
 
-  // Show loading state while progress is being loaded (if documentId is provided)
-  if (documentId && !progressLoaded) {
+  // Show loading state while progress and settings are being loaded
+  if ((documentId && !progressLoaded) || !settingsLoaded) {
     return (
       <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
         <div className="text-white/50 text-center">
           <div className="w-6 h-6 border-2 border-white/30 border-t-white/80 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm">Loading progress...</p>
+          <p className="text-sm">Loading...</p>
         </div>
       </div>
     );
@@ -572,7 +601,7 @@ export function RsvpPlayer({
         ref={textPanelRef}
         data-controls
         className={cn(
-          'absolute top-0 left-0 h-full w-80 sm:w-96 bg-zinc-900/95 backdrop-blur-sm border-r border-white/10 z-20 transition-transform duration-300 ease-in-out',
+          'absolute top-0 left-0 h-full w-80 sm:w-96 overflow-hidden bg-zinc-900/95 backdrop-blur-sm border-r border-white/10 z-20 transition-transform duration-300 ease-in-out',
           showTextPanel ? 'translate-x-0' : '-translate-x-full'
         )}
         onClick={(e) => e.stopPropagation()}
@@ -600,13 +629,44 @@ export function RsvpPlayer({
                 <CloseIcon className="w-4 h-4" />
               </button>
             </div>
-            <div className="h-[calc(100%-52px)] overflow-y-auto p-4 text-sm leading-relaxed">
+            <div className="h-[calc(100%-52px)] overflow-y-auto overscroll-contain p-4 text-sm leading-relaxed">
               <p className="text-white/70 whitespace-pre-wrap">
                 {isFilteringContent ? filterText(text) : text}
               </p>
             </div>
           </>
         ) : null}
+      </div>
+
+      {/* Settings panel - slides from right */}
+      <div
+        data-controls
+        className={cn(
+          'absolute top-0 right-0 h-full w-80 sm:w-96 overflow-hidden bg-zinc-900/95 backdrop-blur-sm border-l border-white/10 z-20 transition-transform duration-300 ease-in-out',
+          showSettingsPanel ? 'translate-x-0' : 'translate-x-full'
+        )}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <RsvpControlsPanel
+          config={timingConfig}
+          onUpdateConfig={(field, value) => {
+            // Update local wpm state for responsiveness
+            if (field === 'wpm') {
+              setWpm(value as number);
+            }
+            // Update saved settings (debounced)
+            updateSavedConfig(field, value);
+          }}
+          onApplyPreset={applyPreset}
+          onResetToFactory={() => {
+            resetToFactory();
+            setWpm(DEFAULT_TIMING_CONFIG.wpm);
+          }}
+          isDirty={isSettingsDirty}
+          isSaving={isSettingsSaving}
+          onSave={saveSettingsNow}
+          onClose={() => setShowSettingsPanel(false)}
+        />
       </div>
 
       {/* Crosshair axis - fixed reference point behind words (hidden) */}
@@ -712,6 +772,19 @@ export function RsvpPlayer({
         >
           <TextIcon className="w-5 h-5" />
         </button>
+        <button
+          data-controls
+          onClick={() => setShowSettingsPanel((p) => !p)}
+          className={cn(
+            'p-2 transition-colors',
+            showSettingsPanel
+              ? 'text-white/80 bg-white/10 rounded'
+              : 'text-white/40 hover:text-white/80'
+          )}
+          title="Show settings (S)"
+        >
+          <SettingsIcon className="w-5 h-5" />
+        </button>
       </div>
 
       {/* Controls overlay */}
@@ -801,7 +874,7 @@ export function RsvpPlayer({
         </div>
 
         {/* Keyboard shortcuts hint */}
-        <div className="flex items-center justify-center gap-4 mt-3 text-xs text-white/30">
+        <div className="flex items-center justify-center gap-4 mt-3 text-xs text-white/30 flex-wrap">
           <span>
             <kbd className="px-1.5 py-0.5 bg-white/10 rounded font-mono text-[10px]">Space</kbd>{' '}
             Play/Pause
@@ -818,7 +891,11 @@ export function RsvpPlayer({
           </span>
           <span>
             <kbd className="px-1.5 py-0.5 bg-white/10 rounded font-mono text-[10px]">T</kbd>{' '}
-            Toggle Text
+            Text
+          </span>
+          <span>
+            <kbd className="px-1.5 py-0.5 bg-white/10 rounded font-mono text-[10px]">S</kbd>{' '}
+            Settings
           </span>
           <span>
             <kbd className="px-1.5 py-0.5 bg-white/10 rounded font-mono text-[10px]">R</kbd>{' '}
@@ -988,6 +1065,29 @@ function FilterIcon({ className }: { className?: string }) {
         strokeLinecap="round"
         strokeLinejoin="round"
         d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+      />
+    </svg>
+  );
+}
+
+function SettingsIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+      />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
       />
     </svg>
   );

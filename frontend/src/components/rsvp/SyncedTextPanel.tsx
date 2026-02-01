@@ -123,7 +123,7 @@ export const SyncedTextPanel = forwardRef<HTMLDivElement, SyncedTextPanelProps>(
     }, [currentBlockIndex, currentWordIndexInBlock, tokenMapping, onWordClick]);
 
     return (
-      <div className="flex flex-col h-full" ref={ref}>
+      <div className="flex flex-col h-full min-h-0" ref={ref}>
         {/* Panel header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0">
           <h3 className="text-white/80 font-medium text-sm">Full Text</h3>
@@ -155,8 +155,14 @@ export const SyncedTextPanel = forwardRef<HTMLDivElement, SyncedTextPanelProps>(
         {/* Panel content - scrollable */}
         <div
           ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto p-4 text-sm leading-relaxed"
+          className="flex-1 overflow-y-scroll min-h-0 p-4 text-sm leading-relaxed"
+          style={{
+            direction: 'rtl',
+            scrollbarWidth: 'thin',
+            scrollbarColor: 'rgba(255,255,255,0.3) rgba(255,255,255,0.1)'
+          }}
         >
+          <div style={{ direction: 'ltr' }}>
           {blocks.map((block, blockIndex) => (
             <div key={blockIndex} className="mb-4">
               {block.type === 'heading' ? (
@@ -170,6 +176,7 @@ export const SyncedTextPanel = forwardRef<HTMLDivElement, SyncedTextPanelProps>(
               )}
             </div>
           ))}
+          </div>
         </div>
       </div>
     );

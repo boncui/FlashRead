@@ -5,11 +5,17 @@ import {
   getTokenDuration,
   getWordLengthMultiplier,
   getEaseInMultiplier,
-  RsvpScheduler,
   getLengthFactor,
   getBoundaryPause,
+  calculateMomentumMultiplier,
+  updateFlowMomentum,
+  updateRollingAverage,
+  calculateAverageCorrection,
+  getFlowAdjustedDuration,
   type RsvpTimingConfig,
+  type FlowState,
 } from '../timing';
+import { RsvpScheduler } from '../scheduler';
 import { tokenize, type RsvpToken } from '../rsvpTokenizer';
 
 describe('DEFAULT_TIMING_CONFIG', () => {
@@ -52,6 +58,10 @@ describe('getTokenDuration with granular punctuation', () => {
     enableParagraphEaseIn: false,
     enableLongRunRelief: false,
     phraseBoundaryMultiplier: 0,
+    // Disable new cadence model to test classic timing
+    enableSyllableWeight: false,
+    enableProsodyFactor: false,
+    enableComplexityFactor: false,
   };
 
   function createToken(overrides: Partial<RsvpToken>): RsvpToken {
@@ -67,6 +77,19 @@ describe('getTokenDuration with granular punctuation', () => {
       paragraphIndex: 0,
       isPhraseBoundary: false,
       wordsSinceLastPause: 0,
+      boundaryType: 'none',
+      tokenComplexity: 0,
+      estimatedSyllables: 1,
+      isAbbreviation: false,
+      isNumber: false,
+      numberType: null,
+      isCitation: false,
+      isCodeLike: false,
+      hasMathSymbols: false,
+      hasOpeningPunctuation: false,
+      hasClosingPunctuation: false,
+      hasDash: false,
+      isEasyWord: false,
       ...overrides,
     };
   }
@@ -130,6 +153,10 @@ describe('getTokenDuration with phrase boundary', () => {
     enableParagraphEaseIn: false,
     enableLongRunRelief: false,
     phraseBoundaryMultiplier: 0.3,
+    // Disable new cadence model to test classic timing
+    enableSyllableWeight: false,
+    enableProsodyFactor: false,
+    enableComplexityFactor: false,
   };
 
   function createToken(overrides: Partial<RsvpToken>): RsvpToken {
@@ -145,6 +172,19 @@ describe('getTokenDuration with phrase boundary', () => {
       paragraphIndex: 0,
       isPhraseBoundary: false,
       wordsSinceLastPause: 0,
+      boundaryType: 'none',
+      tokenComplexity: 0,
+      estimatedSyllables: 1,
+      isAbbreviation: false,
+      isNumber: false,
+      numberType: null,
+      isCitation: false,
+      isCodeLike: false,
+      hasMathSymbols: false,
+      hasOpeningPunctuation: false,
+      hasClosingPunctuation: false,
+      hasDash: false,
+      isEasyWord: false,
       ...overrides,
     };
   }
@@ -173,6 +213,10 @@ describe('getTokenDuration with long-run relief', () => {
     enableParagraphEaseIn: false,
     enableLongRunRelief: true,
     phraseBoundaryMultiplier: 0,
+    // Disable new cadence model to test classic timing
+    enableSyllableWeight: false,
+    enableProsodyFactor: false,
+    enableComplexityFactor: false,
   };
 
   function createToken(overrides: Partial<RsvpToken>): RsvpToken {
@@ -188,6 +232,19 @@ describe('getTokenDuration with long-run relief', () => {
       paragraphIndex: 0,
       isPhraseBoundary: false,
       wordsSinceLastPause: 0,
+      boundaryType: 'none',
+      tokenComplexity: 0,
+      estimatedSyllables: 1,
+      isAbbreviation: false,
+      isNumber: false,
+      numberType: null,
+      isCitation: false,
+      isCodeLike: false,
+      hasMathSymbols: false,
+      hasOpeningPunctuation: false,
+      hasClosingPunctuation: false,
+      hasDash: false,
+      isEasyWord: false,
       ...overrides,
     };
   }
@@ -643,5 +700,390 @@ describe('RsvpScheduler WPM ramping', () => {
     expect(scheduler.isRamping()).toBe(false);
     
     scheduler.destroy();
+  });
+});
+
+describe('Adaptive flow timing', () => {
+  describe('calculateMomentumMultiplier', () => {
+    const config: RsvpTimingConfig = {
+      ...DEFAULT_TIMING_CONFIG,
+      enableMomentum: true,
+      momentumBuildThreshold: 3,
+      momentumMaxBoost: 0.15,
+      momentumDecayRate: 0.5,
+    };
+    
+    it('returns 1.0 when momentum is disabled', () => {
+      const disabledConfig = { ...config, enableMomentum: false };
+      expect(calculateMomentumMultiplier(10, disabledConfig)).toBe(1.0);
+    });
+    
+    it('returns 1.0 before threshold is met', () => {
+      expect(calculateMomentumMultiplier(0, config)).toBe(1.0);
+      expect(calculateMomentumMultiplier(1, config)).toBe(1.0);
+      expect(calculateMomentumMultiplier(2, config)).toBe(1.0);
+    });
+    
+    it('builds momentum gradually after threshold', () => {
+      const mult4 = calculateMomentumMultiplier(4, config); // 1 excess word
+      const mult5 = calculateMomentumMultiplier(5, config); // 2 excess words
+      const mult8 = calculateMomentumMultiplier(8, config); // 5 excess words
+      
+      // Momentum should build: 1.0 -> lower values (faster)
+      expect(mult4).toBeLessThan(1.0);
+      expect(mult5).toBeLessThan(mult4);
+      expect(mult8).toBeLessThan(mult5);
+      
+      // Should approach maximum boost (0.85)
+      expect(mult8).toBeGreaterThanOrEqual(0.85);
+    });
+    
+    it('caps momentum at max boost', () => {
+      const mult20 = calculateMomentumMultiplier(20, config);
+      expect(mult20).toBeCloseTo(0.85); // 1.0 - 0.15 = 0.85
+    });
+  });
+  
+  describe('updateFlowMomentum', () => {
+    function createToken(overrides: Partial<RsvpToken>): RsvpToken {
+      return {
+        text: 'word',
+        isParagraphBreak: false,
+        index: 0,
+        endPunctuation: 'none',
+        isShortWord: false,
+        isSentenceEnd: false,
+        isClauseEnd: false,
+        wordLength: 4,
+        paragraphIndex: 0,
+        isPhraseBoundary: false,
+        wordsSinceLastPause: 0,
+        boundaryType: 'none',
+        tokenComplexity: 0,
+        estimatedSyllables: 1,
+        isAbbreviation: false,
+        isNumber: false,
+        numberType: null,
+        isCitation: false,
+        isCodeLike: false,
+        hasMathSymbols: false,
+        hasOpeningPunctuation: false,
+        hasClosingPunctuation: false,
+        hasDash: false,
+        isEasyWord: false,
+        ...overrides,
+      };
+    }
+    
+    const config: RsvpTimingConfig = {
+      ...DEFAULT_TIMING_CONFIG,
+      enableMomentum: true,
+      momentumBuildThreshold: 3,
+      momentumMaxBoost: 0.15,
+      momentumDecayRate: 0.5,
+    };
+    
+    it('builds momentum on consecutive easy words', () => {
+      const flowState: FlowState = {
+        consecutiveEasyWords: 0,
+        currentMomentum: 1.0,
+        recentDurations: [],
+        recentTargetDurations: [],
+        averageDeviation: 0,
+      };
+      
+      // Add 5 easy words
+      for (let i = 0; i < 5; i++) {
+        const token = createToken({ isEasyWord: true });
+        updateFlowMomentum(flowState, token, config);
+      }
+      
+      expect(flowState.consecutiveEasyWords).toBe(5);
+      expect(flowState.currentMomentum).toBeLessThan(1.0);
+    });
+    
+    it('decays momentum on complex word', () => {
+      const flowState: FlowState = {
+        consecutiveEasyWords: 5,
+        currentMomentum: 0.9,
+        recentDurations: [],
+        recentTargetDurations: [],
+        averageDeviation: 0,
+      };
+      
+      const complexToken = createToken({ isEasyWord: false });
+      updateFlowMomentum(flowState, complexToken, config);
+      
+      // Should decay by 50% (config.momentumDecayRate)
+      expect(flowState.consecutiveEasyWords).toBe(2); // floor(5 * 0.5)
+      expect(flowState.currentMomentum).toBeGreaterThan(0.9); // Less momentum
+    });
+    
+    it('resets momentum on paragraph break', () => {
+      const flowState: FlowState = {
+        consecutiveEasyWords: 5,
+        currentMomentum: 0.9,
+        recentDurations: [],
+        recentTargetDurations: [],
+        averageDeviation: 0,
+      };
+      
+      const paragraphToken = createToken({ isParagraphBreak: true });
+      updateFlowMomentum(flowState, paragraphToken, config);
+      
+      expect(flowState.consecutiveEasyWords).toBe(0);
+      expect(flowState.currentMomentum).toBe(1.0);
+    });
+    
+    it('resets momentum on sentence end', () => {
+      const flowState: FlowState = {
+        consecutiveEasyWords: 5,
+        currentMomentum: 0.9,
+        recentDurations: [],
+        recentTargetDurations: [],
+        averageDeviation: 0,
+      };
+      
+      const sentenceEndToken = createToken({ isSentenceEnd: true });
+      updateFlowMomentum(flowState, sentenceEndToken, config);
+      
+      expect(flowState.consecutiveEasyWords).toBe(0);
+      expect(flowState.currentMomentum).toBe(1.0);
+    });
+  });
+  
+  describe('updateRollingAverage', () => {
+    const config: RsvpTimingConfig = {
+      ...DEFAULT_TIMING_CONFIG,
+      enableAdaptivePacing: true,
+      averageWindowSize: 10,
+    };
+    
+    it('maintains sliding window of correct size', () => {
+      const flowState: FlowState = {
+        consecutiveEasyWords: 0,
+        currentMomentum: 1.0,
+        recentDurations: [],
+        recentTargetDurations: [],
+        averageDeviation: 0,
+      };
+      
+      // Add 15 durations (window size is 10)
+      for (let i = 0; i < 15; i++) {
+        updateRollingAverage(flowState, 200, 200, config);
+      }
+      
+      expect(flowState.recentDurations.length).toBe(10);
+      expect(flowState.recentTargetDurations.length).toBe(10);
+    });
+    
+    it('calculates deviation correctly when running slower', () => {
+      const flowState: FlowState = {
+        consecutiveEasyWords: 0,
+        currentMomentum: 1.0,
+        recentDurations: [],
+        recentTargetDurations: [],
+        averageDeviation: 0,
+      };
+      
+      // Add durations where actual is 20% slower than target
+      for (let i = 0; i < 10; i++) {
+        updateRollingAverage(flowState, 240, 200, config); // 20% slower
+      }
+      
+      // Deviation should be positive (too slow)
+      expect(flowState.averageDeviation).toBeCloseTo(0.2);
+    });
+    
+    it('calculates deviation correctly when running faster', () => {
+      const flowState: FlowState = {
+        consecutiveEasyWords: 0,
+        currentMomentum: 1.0,
+        recentDurations: [],
+        recentTargetDurations: [],
+        averageDeviation: 0,
+      };
+      
+      // Add durations where actual is 20% faster than target
+      for (let i = 0; i < 10; i++) {
+        updateRollingAverage(flowState, 160, 200, config); // 20% faster
+      }
+      
+      // Deviation should be negative (too fast)
+      expect(flowState.averageDeviation).toBeCloseTo(-0.2);
+    });
+  });
+  
+  describe('calculateAverageCorrection', () => {
+    const config: RsvpTimingConfig = {
+      ...DEFAULT_TIMING_CONFIG,
+      enableAdaptivePacing: true,
+    };
+    
+    it('returns 1.0 when not enough samples', () => {
+      const flowState: FlowState = {
+        consecutiveEasyWords: 0,
+        currentMomentum: 1.0,
+        recentDurations: [200, 200],
+        recentTargetDurations: [200, 200],
+        averageDeviation: 0,
+      };
+      
+      expect(calculateAverageCorrection(flowState, config)).toBe(1.0);
+    });
+    
+    it('applies correction when running too slow', () => {
+      const flowState: FlowState = {
+        consecutiveEasyWords: 0,
+        currentMomentum: 1.0,
+        recentDurations: [240, 240, 240, 240, 240],
+        recentTargetDurations: [200, 200, 200, 200, 200],
+        averageDeviation: 0.2, // 20% too slow
+      };
+      
+      const correction = calculateAverageCorrection(flowState, config);
+      
+      // Correction should be <1.0 to speed up
+      expect(correction).toBeLessThan(1.0);
+      expect(correction).toBeGreaterThanOrEqual(0.95); // Clamped to 95%
+    });
+    
+    it('applies correction when running too fast', () => {
+      const flowState: FlowState = {
+        consecutiveEasyWords: 0,
+        currentMomentum: 1.0,
+        recentDurations: [160, 160, 160, 160, 160],
+        recentTargetDurations: [200, 200, 200, 200, 200],
+        averageDeviation: -0.2, // 20% too fast
+      };
+      
+      const correction = calculateAverageCorrection(flowState, config);
+      
+      // Correction should be >1.0 to slow down
+      expect(correction).toBeGreaterThan(1.0);
+      expect(correction).toBeLessThanOrEqual(1.05); // Clamped to 105%
+    });
+  });
+  
+  describe('getFlowAdjustedDuration', () => {
+    function createToken(overrides: Partial<RsvpToken>): RsvpToken {
+      return {
+        text: 'word',
+        isParagraphBreak: false,
+        index: 0,
+        endPunctuation: 'none',
+        isShortWord: false,
+        isSentenceEnd: false,
+        isClauseEnd: false,
+        wordLength: 4,
+        paragraphIndex: 0,
+        isPhraseBoundary: false,
+        wordsSinceLastPause: 0,
+        boundaryType: 'none',
+        tokenComplexity: 0,
+        estimatedSyllables: 1,
+        isAbbreviation: false,
+        isNumber: false,
+        numberType: null,
+        isCitation: false,
+        isCodeLike: false,
+        hasMathSymbols: false,
+        hasOpeningPunctuation: false,
+        hasClosingPunctuation: false,
+        hasDash: false,
+        isEasyWord: true,
+        ...overrides,
+      };
+    }
+    
+    const config: RsvpTimingConfig = {
+      ...DEFAULT_TIMING_CONFIG,
+      wpm: 300,
+      enableAdaptivePacing: true,
+      enableMomentum: true,
+      targetWpmVariance: 0.20,
+    };
+    
+    it('returns base duration when adaptive pacing disabled', () => {
+      const disabledConfig = { ...config, enableAdaptivePacing: false };
+      const token = createToken({});
+      const flowState: FlowState = {
+        consecutiveEasyWords: 5,
+        currentMomentum: 0.9,
+        recentDurations: [],
+        recentTargetDurations: [],
+        averageDeviation: 0,
+      };
+      
+      const duration = getFlowAdjustedDuration(200, token, flowState, disabledConfig);
+      expect(duration).toBe(200);
+    });
+    
+    it('applies momentum multiplier', () => {
+      const token = createToken({});
+      const flowState: FlowState = {
+        consecutiveEasyWords: 5,
+        currentMomentum: 0.9, // 10% speed boost
+        recentDurations: [],
+        recentTargetDurations: [],
+        averageDeviation: 0,
+      };
+      
+      const duration = getFlowAdjustedDuration(200, token, flowState, config);
+      
+      // Should be faster than base (momentum <1.0)
+      expect(duration).toBeLessThan(200);
+      expect(duration).toBeCloseTo(180); // 200 * 0.9
+    });
+    
+    it('enforces variance bounds', () => {
+      const token = createToken({});
+      const flowState: FlowState = {
+        consecutiveEasyWords: 10,
+        currentMomentum: 0.5, // Extreme momentum (would be 50% faster)
+        recentDurations: [],
+        recentTargetDurations: [],
+        averageDeviation: 0,
+      };
+      
+      const duration = getFlowAdjustedDuration(200, token, flowState, config);
+      
+      // Should be clamped by targetWpmVariance (±20%)
+      // Min duration = 200 * (1 - 0.20) = 160
+      expect(duration).toBeGreaterThanOrEqual(160);
+    });
+  });
+});
+
+describe('isEasyWord from tokenizer', () => {
+  it('identifies easy words in common text', () => {
+    const tokens = tokenize('The dog was in the house');
+    
+    // All should be easy words (common, short, no punctuation)
+    // Filter out any paragraph breaks
+    const wordTokens = tokens.filter(t => !t.isParagraphBreak);
+    expect(wordTokens.every(t => t.isEasyWord)).toBe(true);
+  });
+  
+  it('identifies complex words correctly', () => {
+    const tokens = tokenize('The magnificently orchestrated symphony');
+    
+    // "The" should be easy
+    expect(tokens[0].isEasyWord).toBe(true);
+    
+    // "magnificently", "orchestrated", "symphony" should NOT be easy (too long/complex)
+    expect(tokens[1].isEasyWord).toBe(false);
+    expect(tokens[2].isEasyWord).toBe(false);
+    expect(tokens[3].isEasyWord).toBe(false);
+  });
+  
+  it('identifies words with punctuation as not easy', () => {
+    const tokens = tokenize('Hello, world!');
+    
+    // "Hello," has comma - not easy
+    expect(tokens[0].isEasyWord).toBe(false);
+    
+    // "world!" has exclamation - not easy
+    expect(tokens[1].isEasyWord).toBe(false);
   });
 });

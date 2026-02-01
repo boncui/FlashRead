@@ -90,6 +90,11 @@ export interface RsvpToken {
   hasClosingPunctuation: boolean;
   /** Whether this contains a dash — – */
   hasDash: boolean;
+  
+  // === ADAPTIVE FLOW TIMING ===
+  
+  /** Whether this is an "easy" word for momentum building (common, short, simple) */
+  isEasyWord: boolean;
 }
 
 /**
@@ -418,6 +423,43 @@ export function isCodeLike(token: string): boolean {
  */
 export function hasMathSymbols(token: string): boolean {
   return MATH_SYMBOLS_PATTERN.test(token);
+}
+
+/**
+ * Check if a token is "easy" for momentum building during flow timing.
+ * Easy words are recognized quickly and can be sped up during momentum.
+ * 
+ * Criteria:
+ * - In top 5K common words
+ * - 1-2 syllables
+ * - No punctuation (or only mild punctuation like comma)
+ * - Not a number, citation, or code-like
+ */
+export function isEasyWord(token: string, syllables: number, complexity: number): boolean {
+  const cleaned = token.toLowerCase().replace(/[^a-z]/g, '');
+  
+  // Must be in common word list
+  if (!COMMON_WORDS_5K.has(cleaned)) {
+    return false;
+  }
+  
+  // Must be short (1-2 syllables)
+  if (syllables > 2) {
+    return false;
+  }
+  
+  // Must not be complex (low complexity score)
+  if (complexity > 0.3) {
+    return false;
+  }
+  
+  // Must not have heavy punctuation (period, question, exclamation are NOT easy)
+  const hasPunctuation = /[.?!;:]$/.test(token.trim());
+  if (hasPunctuation) {
+    return false;
+  }
+  
+  return true;
 }
 
 /**
@@ -789,6 +831,10 @@ export function tokenize(sourceText: string): RsvpToken[] {
         hasDash: tokenHasDash,
       });
       
+      // Compute easy word flag for momentum (exclude numbers, citations, code)
+      const tokenIsEasyWord = !tokenIsNumber && !tokenIsCitation && !tokenIsCodeLike && 
+                              isEasyWord(subToken, syllables, complexity);
+      
       tokens.push({
         text: subToken,
         isParagraphBreak: false,
@@ -814,6 +860,8 @@ export function tokenize(sourceText: string): RsvpToken[] {
         hasOpeningPunctuation: tokenHasOpeningPunctuation,
         hasClosingPunctuation: tokenHasClosingPunctuation,
         hasDash: tokenHasDash,
+        // Adaptive flow timing
+        isEasyWord: tokenIsEasyWord,
       });
       
       index++;
@@ -854,6 +902,8 @@ export function tokenize(sourceText: string): RsvpToken[] {
         hasOpeningPunctuation: false,
         hasClosingPunctuation: false,
         hasDash: false,
+        // Adaptive flow timing
+        isEasyWord: false,
       });
       index++;
     }
@@ -926,7 +976,10 @@ export function createTokenBlockMapping(
   
   for (let blockIdx = 0; blockIdx < blocks.length; blockIdx++) {
     const block = blocks[blockIdx];
-    const blockText = block.text.trim();
+    // Apply same sanitization as tokenize() to ensure token indices align
+    const sanitized = sanitizeText(block.text);
+    const normalized = normalizeText(sanitized);
+    const blockText = normalized.trim();
     
     if (!blockText) continue;
     

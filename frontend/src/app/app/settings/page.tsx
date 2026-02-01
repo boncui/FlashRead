@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { updateEmail, deleteAccount } from '@flashread/backend/actions/auth';
+import { RsvpSettingsCard } from '@/components/rsvp/RsvpSettingsCard';
 
 export default function SettingsPage() {
   const [email, setEmail] = useState('');
@@ -50,6 +51,9 @@ export default function SettingsPage() {
       <h1 className="text-3xl font-bold mb-8">Account Settings</h1>
 
       <div className="space-y-6">
+        {/* RSVP Settings */}
+        <RsvpSettingsCard />
+
         {/* Update Email */}
         <Card>
           <CardHeader>
