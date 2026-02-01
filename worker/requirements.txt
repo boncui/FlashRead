@@ -1,0 +1,13 @@
+PyMuPDF==1.23.8
+supabase==2.9.0
+pydantic==2.5.3
+boto3==1.34.0
+python-dotenv==1.0.0
+
+# Phase 2b OCR dependencies
+paddleocr==2.7.3
+paddlepaddle==2.6.2
+pytesseract==0.3.10
+opencv-python-headless==4.9.0.80
+Pillow==10.2.0
+numpy==1.26.3

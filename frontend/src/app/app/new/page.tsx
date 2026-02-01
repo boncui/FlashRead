@@ -10,10 +10,14 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FlashreadRenderer } from '@/components/flashread-renderer';
+import { PdfUpload } from '@/components/pdf-upload';
 import { RenderedBlock } from '@flashread/dependencies/types';
+
+type InputMode = 'text' | 'pdf';
 
 export default function NewFlashreadPage() {
   const router = useRouter();
+  const [mode, setMode] = useState<InputMode>('text');
   const [title, setTitle] = useState('');
   const [sourceText, setSourceText] = useState('');
   const [preview, setPreview] = useState<RenderedBlock[]>([]);
@@ -58,55 +62,107 @@ export default function NewFlashreadPage() {
       <h1 className="text-4xl font-bold mb-8">Create New FlashRead</h1>
 
       <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Input</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="title">Title (optional)</Label>
-              <Input
-                id="title"
-                placeholder="Enter a title..."
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="source">Source Text</Label>
-              <Textarea
-                id="source"
-                placeholder="Paste your text here..."
-                value={sourceText}
-                onChange={(e) => setSourceText(e.target.value)}
-                className="min-h-[300px]"
-                disabled={loading}
-              />
-            </div>
-            {error && (
-              <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
-                {error}
-              </div>
-            )}
-            <div className="flex gap-2">
-              <Button onClick={handlePreview} variant="outline" disabled={loading}>
-                Preview
-              </Button>
-              <Button onClick={handleSave} disabled={loading}>
-                {loading ? 'Saving...' : 'Save FlashRead'}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Mode Toggle */}
+        <div className="flex gap-1 p-1 bg-muted rounded-lg w-fit">
+          <button
+            onClick={() => setMode('text')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              mode === 'text'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Paste Text
+          </button>
+          <button
+            onClick={() => setMode('pdf')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              mode === 'pdf'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Upload PDF
+          </button>
+        </div>
 
-        {preview.length > 0 && (
+        {/* Text Input Mode */}
+        {mode === 'text' && (
+          <>
+            <Card>
+              <CardHeader>
+                <CardTitle>Input</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="title">Title (optional)</Label>
+                  <Input
+                    id="title"
+                    placeholder="Enter a title..."
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="source">Source Text</Label>
+                  <Textarea
+                    id="source"
+                    placeholder="Paste your text here..."
+                    value={sourceText}
+                    onChange={(e) => setSourceText(e.target.value)}
+                    className="min-h-[300px]"
+                    disabled={loading}
+                  />
+                </div>
+                {error && (
+                  <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
+                    {error}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Button onClick={handlePreview} variant="outline" disabled={loading}>
+                    Preview
+                  </Button>
+                  <Button onClick={handleSave} disabled={loading}>
+                    {loading ? 'Saving...' : 'Save FlashRead'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {preview.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Preview</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <FlashreadRenderer blocks={preview} />
+                </CardContent>
+              </Card>
+            )}
+          </>
+        )}
+
+        {/* PDF Upload Mode */}
+        {mode === 'pdf' && (
           <Card>
             <CardHeader>
-              <CardTitle>Preview</CardTitle>
+              <CardTitle>Upload Research Paper</CardTitle>
             </CardHeader>
-            <CardContent>
-              <FlashreadRenderer blocks={preview} />
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Upload a PDF file. The document will be stored and queued for OCR processing.
+                Once processed, you'll be able to read it as a FlashRead.
+              </p>
+              <PdfUpload
+                onUploadComplete={(doc) => {
+                  router.push(`/app/documents/${doc.id}`);
+                }}
+                onExistingDocument={(doc) => {
+                  // User can choose to view existing from the component UI
+                }}
+              />
             </CardContent>
           </Card>
         )}
