@@ -642,6 +642,113 @@ export async function updateDerivedContent(
 }
 
 // ============================================================
+// Reading Progress Functions
+// ============================================================
+
+/**
+ * Save reading progress for a document
+ * Stores the current token index and optionally the WPM setting
+ */
+export async function saveReadingProgress(
+  documentId: string,
+  tokenIndex: number,
+  wpm?: number
+): Promise<void> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error('Not authenticated');
+  }
+
+  // Get current document to merge derived content
+  const { data: document, error: fetchError } = await supabase
+    .from('documents')
+    .select('derived_content')
+    .eq('id', documentId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (fetchError) {
+    if (fetchError.code === 'PGRST116') {
+      throw new Error('Document not found');
+    }
+    throw new Error(fetchError.message);
+  }
+
+  const currentContent = document.derived_content || {};
+  const updatedContent = {
+    ...currentContent,
+    reading_progress_v1: {
+      token_index: tokenIndex,
+      updated_at: new Date().toISOString(),
+      ...(wpm !== undefined && { wpm }),
+    },
+  };
+
+  const { error } = await supabase
+    .from('documents')
+    .update({
+      derived_content: updatedContent,
+      // Don't update updated_at for reading progress saves to avoid
+      // changing the document's "last modified" timestamp
+    })
+    .eq('id', documentId)
+    .eq('user_id', user.id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  // Don't revalidate paths for reading progress saves (too frequent)
+}
+
+/**
+ * Get reading progress for a document
+ * Returns the saved progress or null if none exists
+ */
+export async function getReadingProgress(
+  documentId: string
+): Promise<{ token_index: number; wpm?: number } | null> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error('Not authenticated');
+  }
+
+  const { data: document, error } = await supabase
+    .from('documents')
+    .select('derived_content')
+    .eq('id', documentId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return null;
+    }
+    throw new Error(error.message);
+  }
+
+  const progress = document.derived_content?.reading_progress_v1;
+  if (!progress || typeof progress.token_index !== 'number') {
+    return null;
+  }
+
+  return {
+    token_index: progress.token_index,
+    wpm: progress.wpm,
+  };
+}
+
+// ============================================================
 // Service-level functions (no auth check, for worker use)
 // ============================================================
 

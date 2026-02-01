@@ -82,7 +82,7 @@ export default function NewFlashreadPage() {
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            Upload PDF
+            Upload File
           </button>
         </div>
 
@@ -144,16 +144,19 @@ export default function NewFlashreadPage() {
           </>
         )}
 
-        {/* PDF Upload Mode */}
+        {/* File Upload Mode */}
         {mode === 'pdf' && (
           <Card>
             <CardHeader>
-              <CardTitle>Upload Research Paper</CardTitle>
+              <CardTitle>Upload Document</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Upload a PDF file. The document will be stored and queued for OCR processing.
-                Once processed, you'll be able to read it as a FlashRead.
+                <strong>TXT files:</strong> Instantly converted to FlashRead format.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                <strong>PDF files:</strong> Text will be extracted automatically. 
+                Scanned PDFs may require OCR processing.
               </p>
               <PdfUpload
                 onUploadComplete={(doc) => {

@@ -6,13 +6,16 @@ import { Button } from '@/components/ui/button';
 import { 
   requestDocumentUpload, 
   checkDocumentByHash, 
-  markDocumentUploaded 
+  markDocumentUploaded,
+  createFlashread
 } from '@flashread/backend/actions';
+import { formatTextToBlocks } from '@flashread/backend/lib/flashread-formatter';
 import type { Document } from '@flashread/dependencies/types';
 
 interface PdfUploadProps {
   onUploadComplete?: (document: Document) => void;
   onExistingDocument?: (document: Document) => void;
+  onTxtComplete?: () => void;
 }
 
 type UploadState = 
@@ -22,6 +25,7 @@ type UploadState =
   | { status: 'duplicate'; document: Document }
   | { status: 'uploading'; progress: number }
   | { status: 'complete'; document: Document }
+  | { status: 'processing_txt'; fileName: string }
   | { status: 'error'; message: string };
 
 /**
@@ -43,27 +47,48 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function PdfUpload({ onUploadComplete, onExistingDocument }: PdfUploadProps) {
+export function PdfUpload({ onUploadComplete, onExistingDocument, onTxtComplete }: PdfUploadProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<UploadState>({ status: 'idle' });
   const [isDragOver, setIsDragOver] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const handleFile = useCallback(async (file: File) => {
-    // Validate file type
-    if (file.type !== 'application/pdf') {
-      setState({ status: 'error', message: 'Please select a PDF file' });
-      return;
-    }
+  const handleTxtFile = useCallback(async (file: File) => {
+    setSelectedFile(file);
+    setState({ status: 'processing_txt', fileName: file.name });
 
-    // Validate file size (max 50MB)
-    const maxSize = 50 * 1024 * 1024;
-    if (file.size > maxSize) {
-      setState({ status: 'error', message: 'File size must be less than 50MB' });
-      return;
-    }
+    try {
+      // Read the file content
+      const text = await file.text();
+      
+      if (!text.trim()) {
+        setState({ status: 'error', message: 'The file appears to be empty' });
+        return;
+      }
 
+      // Create FlashRead directly from the text (same as manual paste)
+      const blocks = formatTextToBlocks(text);
+      const title = file.name.replace(/\.txt$/i, '') || 'Untitled';
+      
+      await createFlashread({
+        title,
+        source_text: text,
+        rendered_blocks: blocks,
+      });
+      
+      // The createFlashread action redirects, but we also call the callback
+      onTxtComplete?.();
+    } catch (error) {
+      console.error('TXT processing error:', error);
+      setState({ 
+        status: 'error', 
+        message: error instanceof Error ? error.message : 'Failed to process TXT file' 
+      });
+    }
+  }, [onTxtComplete]);
+
+  const handlePdfFile = useCallback(async (file: File) => {
     setSelectedFile(file);
 
     try {
@@ -139,6 +164,30 @@ export function PdfUpload({ onUploadComplete, onExistingDocument }: PdfUploadPro
     }
   }, [onUploadComplete, onExistingDocument]);
 
+  const handleFile = useCallback(async (file: File) => {
+    // Validate file size (max 50MB)
+    const maxSize = 50 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setState({ status: 'error', message: 'File size must be less than 50MB' });
+      return;
+    }
+
+    // Handle TXT files - create FlashRead directly
+    if (file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt')) {
+      await handleTxtFile(file);
+      return;
+    }
+
+    // Handle PDF files - upload and process
+    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+      await handlePdfFile(file);
+      return;
+    }
+
+    // Unsupported file type
+    setState({ status: 'error', message: 'Please select a PDF or TXT file' });
+  }, [handleTxtFile, handlePdfFile]);
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
@@ -189,7 +238,7 @@ export function PdfUpload({ onUploadComplete, onExistingDocument }: PdfUploadPro
       <input
         ref={fileInputRef}
         type="file"
-        accept="application/pdf,.pdf"
+        accept="application/pdf,.pdf,text/plain,.txt"
         onChange={handleFileInput}
         className="hidden"
       />
@@ -225,9 +274,24 @@ export function PdfUpload({ onUploadComplete, onExistingDocument }: PdfUploadPro
               />
             </svg>
             <div>
-              <p className="font-medium">Drop your PDF here</p>
+              <p className="font-medium">Drop your file here</p>
               <p className="text-sm text-muted-foreground mt-1">
-                or click to browse (max 50MB)
+                PDF or TXT (max 50MB)
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Processing TXT state */}
+      {state.status === 'processing_txt' && (
+        <div className="border rounded-lg p-6">
+          <div className="flex items-center gap-3">
+            <div className="animate-spin w-5 h-5 border-2 border-primary border-t-transparent rounded-full" />
+            <div className="flex-1">
+              <p className="font-medium">Processing text file...</p>
+              <p className="text-sm text-muted-foreground">
+                {state.fileName}
               </p>
             </div>
           </div>

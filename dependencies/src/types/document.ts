@@ -3,7 +3,7 @@
 //                                      \-> error
 //                       \-> processing -> ocr_failed
 export type DocumentStatus = 'uploading' | 'uploaded' | 'pending_ocr' | 'processing' | 'ready' | 'ocr_failed' | 'error';
-export type DocumentFileType = 'pdf' | 'docx' | 'doc' | 'pptx' | 'ppt';
+export type DocumentFileType = 'pdf' | 'txt' | 'docx' | 'doc' | 'pptx' | 'ppt';
 
 // ============================================================
 // OCR Version Types - Structured text extraction from documents
@@ -105,11 +105,21 @@ export interface DerivedSummary {
   source_ocr_version: string;
 }
 
+export interface DerivedReadingProgress {
+  /** Last read token position (0-based index) */
+  token_index: number;
+  /** ISO timestamp of last save */
+  updated_at: string;
+  /** Optional: saved WPM preference */
+  wpm?: number;
+}
+
 export interface DerivedContent {
   markdown_v1?: DerivedMarkdown;
   flashread_v1?: DerivedFlashread;
   summary_v1?: DerivedSummary;
-  [key: string]: DerivedMarkdown | DerivedFlashread | DerivedSummary | undefined;
+  reading_progress_v1?: DerivedReadingProgress;
+  [key: string]: DerivedMarkdown | DerivedFlashread | DerivedSummary | DerivedReadingProgress | undefined;
 }
 
 // ============================================================

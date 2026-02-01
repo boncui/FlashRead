@@ -6,9 +6,9 @@ import { Flashread } from '@flashread/dependencies/types';
 import { updateFlashread, deleteFlashread } from '@flashread/backend/actions/flashreads';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FlashreadRenderer } from '@/components/flashread-renderer';
+import { FlashReadMode } from '@/components/flashread-mode';
 
 interface FlashreadDetailClientProps {
   flashread: Flashread;
@@ -20,6 +20,7 @@ export function FlashreadDetailClient({ flashread }: FlashreadDetailClientProps)
   const [title, setTitle] = useState(flashread.title);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isReadingMode, setIsReadingMode] = useState(false);
 
   async function handleTitleSave() {
     if (!title.trim()) {
@@ -57,15 +58,34 @@ export function FlashreadDetailClient({ flashread }: FlashreadDetailClientProps)
     }
   }
 
+  // Reading mode view
+  if (isReadingMode) {
+    return (
+      <FlashReadMode
+        blocks={flashread.rendered_blocks}
+        title={flashread.title}
+        onExit={() => setIsReadingMode(false)}
+      />
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <div className="mb-6">
+      <div className="mb-6 flex items-center justify-between">
         <Button
           variant="outline"
           onClick={() => router.push('/app')}
           disabled={loading}
         >
           ← Back to List
+        </Button>
+        <Button
+          onClick={() => setIsReadingMode(true)}
+          disabled={loading || flashread.rendered_blocks.length === 0}
+          className="gap-2"
+        >
+          <PlayIcon className="w-4 h-4" />
+          Start Reading
         </Button>
       </div>
 
@@ -139,5 +159,19 @@ export function FlashreadDetailClient({ flashread }: FlashreadDetailClientProps)
         </Button>
       </div>
     </div>
+  );
+}
+
+// Play icon for the Start Reading button
+function PlayIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="currentColor"
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M8 5v14l11-7z" />
+    </svg>
   );
 }

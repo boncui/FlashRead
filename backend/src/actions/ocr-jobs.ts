@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createServiceClient } from '../lib/supabase/service';
+import { createClient } from '../lib/supabase/server';
 import { OcrVersion } from '../lib/types';
 
 interface DocumentJob {
@@ -317,4 +318,40 @@ export async function getJobForDocument(documentId: string): Promise<DocumentJob
   }
 
   return data as DocumentJob;
+}
+
+/**
+ * Log OCR demand signal when a user clicks the OCR button multiple times.
+ * This tracks demand for the OCR feature (for analytics/prioritization).
+ * Only logs for authenticated users.
+ */
+export async function logOcrDemand(
+  documentId: string,
+  clickCount: number
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+
+  // Get the authenticated user
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, error: 'User not authenticated' };
+  }
+
+  // Insert the demand signal
+  const { error } = await supabase.from('ocr_demand_signals').insert({
+    user_id: user.id,
+    document_id: documentId,
+    click_count: clickCount,
+  });
+
+  if (error) {
+    console.error('Failed to log OCR demand:', error.message);
+    return { success: false, error: error.message };
+  }
+
+  console.log(`Logged OCR demand signal: user=${user.id}, doc=${documentId}, clicks=${clickCount}`);
+  return { success: true };
 }

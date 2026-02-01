@@ -6,6 +6,7 @@ This module handles OCR processing for documents that lack usable text layers:
 - Tesseract as the fallback engine
 - Adaptive DPI rerendering for poor quality pages
 - Normalized output conforming to OcrVersion schema
+- Block classification for content filtering (headers, footers, captions, etc.)
 """
 
 from .renderer import render_page
@@ -14,6 +15,7 @@ from .tesseract_engine import TesseractEngine
 from .router import process_document_ocr
 from .normalize import build_ocr_version
 from .quality import is_page_quality_ok, is_doc_ocr_sufficient
+from .classifier import classify_block, is_core_content, BlockType
 
 __all__ = [
     'render_page',
@@ -23,4 +25,7 @@ __all__ = [
     'build_ocr_version',
     'is_page_quality_ok',
     'is_doc_ocr_sufficient',
+    'classify_block',
+    'is_core_content',
+    'BlockType',
 ]

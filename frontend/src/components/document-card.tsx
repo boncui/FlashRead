@@ -18,14 +18,25 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function PlayIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="currentColor"
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M8 5v14l11-7z" />
+    </svg>
+  );
+}
+
 export function DocumentCard({ document }: DocumentCardProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  // Link to FlashRead viewer if ready, otherwise to document status page
-  const href = document.status === 'ready' && document.derived_content?.flashread_v1
-    ? `/app/${document.id}`
-    : `/app/documents/${document.id}`;
+  // Always link to document detail page (which has reading mode when ready)
+  const href = `/app/documents/${document.id}`;
 
   const handleDelete = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -97,6 +108,14 @@ export function DocumentCard({ document }: DocumentCardProps) {
               </div>
             )}
           </div>
+          {document.status === 'ready' && document.derived_content?.flashread_v1 && (
+            <div className="mt-3 pt-3 border-t">
+              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-primary">
+                <PlayIcon className="w-4 h-4" />
+                Ready to Read
+              </span>
+            </div>
+          )}
         </CardContent>
       </Card>
     </Link>

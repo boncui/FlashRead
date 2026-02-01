@@ -1,10 +1,14 @@
 import { notFound } from 'next/navigation';
 import { getDocument, getDocumentDownloadUrl } from '@flashread/backend/actions';
+import { formatTextToBlocks } from '@flashread/backend/lib/flashread-formatter';
+import type { Document, DerivedFlashread } from '@flashread/dependencies/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DocumentStatusCard } from '@/components/document-status';
 import { RetryUploadButton } from '@/components/retry-upload-button';
 import { DeleteDocumentButton } from '@/components/delete-document-button';
+import { DocumentReadClient } from '@/components/document-read-client';
+import { OcrDemandButton } from '@/components/ocr-demand-button';
 import Link from 'next/link';
 
 interface DocumentPageProps {
@@ -25,6 +29,38 @@ function formatDate(dateString: string): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+/**
+ * Get flashread data from document, with fallback to deriving from ocr_versions
+ * when derived_content.flashread_v1 is not populated
+ */
+function getFlashreadData(document: Document): DerivedFlashread | null {
+  // First check if flashread_v1 exists
+  if (document.derived_content?.flashread_v1) {
+    return document.derived_content.flashread_v1;
+  }
+
+  // Fallback: derive from ocr_versions
+  const ocrVersions = document.ocr_versions;
+  if (!ocrVersions) return null;
+
+  // Get the latest OCR version's doc_text
+  const versionKeys = Object.keys(ocrVersions);
+  if (versionKeys.length === 0) return null;
+
+  const latestKey = versionKeys.sort().pop()!;
+  const ocrVersion = ocrVersions[latestKey];
+  const docText = ocrVersion.doc_text;
+  if (!docText) return null;
+
+  // Use formatTextToBlocks to convert to flashread format
+  const blocks = formatTextToBlocks(docText);
+  return {
+    blocks,
+    created_at: ocrVersion.created_at,
+    source_ocr_version: latestKey,
+  };
 }
 
 export default async function DocumentPage({ params }: DocumentPageProps) {
@@ -172,11 +208,12 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
             <CardHeader>
               <CardTitle className="text-amber-600 dark:text-amber-400">OCR Required</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
               <p className="text-muted-foreground">
                 This document requires OCR processing. Text extraction found no usable text layer.
-                This means the PDF is likely scanned or image-based. OCR processing is automatically queued.
+                This means the PDF is likely scanned or image-based.
               </p>
+              <OcrDemandButton documentId={document.id} documentName={document.name} />
             </CardContent>
           </Card>
         )}
@@ -185,33 +222,29 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
         {ocrFailed && (
           <Card className="border-red-200 dark:border-red-900">
             <CardHeader>
-              <CardTitle className="text-red-600 dark:text-red-400">OCR Failed</CardTitle>
+              <CardTitle className="text-red-600 dark:text-red-400">OCR Unavailable</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
               <p className="text-muted-foreground">
-                OCR processing could not extract sufficient text from this document.
-                The document may be damaged, very low quality, or in an unsupported format.
+                OCR processing is not currently available for this document.
+                The document may be scanned or image-based.
               </p>
+              <OcrDemandButton documentId={document.id} documentName={document.name} />
             </CardContent>
           </Card>
         )}
 
-        {/* Ready State - Show FlashRead Link */}
-        {isReady && document.derived_content?.flashread_v1 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Read Document</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground mb-4">
-                Your document has been processed and is ready to read.
-              </p>
-              <Button asChild>
-                <Link href={`/app/${id}`}>Read as FlashRead</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+        {/* Ready State - Show FlashRead Options */}
+        {(() => {
+          const flashreadData = isReady ? getFlashreadData(document) : null;
+          return flashreadData ? (
+            <DocumentReadClient
+              documentId={id}
+              documentName={document.name}
+              flashreadData={flashreadData}
+            />
+          ) : null;
+        })()}
 
         {/* OCR Versions Info (for debugging/transparency) */}
         {document.ocr_versions && Object.keys(document.ocr_versions).length > 0 && (

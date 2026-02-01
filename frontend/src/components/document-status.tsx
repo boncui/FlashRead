@@ -31,7 +31,7 @@ const STATUS_CONFIG: Record<DocumentStatus, {
   },
   pending_ocr: {
     label: 'Needs OCR',
-    description: 'Document needs OCR processing (no text layer detected).',
+    description: 'This document is scanned or image-based. OCR is required to extract text.',
     color: 'text-amber-600 dark:text-amber-400',
     bgColor: 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900',
     icon: 'clock',
@@ -51,11 +51,11 @@ const STATUS_CONFIG: Record<DocumentStatus, {
     icon: 'check',
   },
   ocr_failed: {
-    label: 'OCR Failed',
-    description: 'OCR could not extract sufficient text from this document.',
-    color: 'text-red-600 dark:text-red-400',
-    bgColor: 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-900',
-    icon: 'error',
+    label: 'OCR Unavailable',
+    description: 'OCR is not currently available for this document.',
+    color: 'text-amber-600 dark:text-amber-400',
+    bgColor: 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900',
+    icon: 'clock',
   },
   error: {
     label: 'Error',

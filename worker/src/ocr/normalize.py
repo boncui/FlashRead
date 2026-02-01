@@ -9,14 +9,23 @@ import sys
 sys.path.append('..')
 from ..models import OcrVersion, OcrPage, PageBlock, OcrMetrics
 from .paddle_engine import OcrBlock
+from .classifier import classify_block, is_core_content
 
 
-def normalize_paddle_output(blocks: List[OcrBlock]) -> List[PageBlock]:
+def normalize_paddle_output(
+    blocks: List[OcrBlock],
+    page_height: float = 0,
+    page_width: float = 0,
+    classify: bool = True
+) -> List[PageBlock]:
     """
     Normalize PaddleOCR blocks to PageBlock schema.
     
     Args:
         blocks: List of OcrBlock objects from PaddleOCR
+        page_height: Page height for position-based classification
+        page_width: Page width for position-based classification
+        classify: Whether to classify blocks (default True)
         
     Returns:
         List of PageBlock objects conforming to schema
@@ -24,8 +33,19 @@ def normalize_paddle_output(blocks: List[OcrBlock]) -> List[PageBlock]:
     page_blocks = []
     
     for block in blocks:
+        # Determine block type
+        if classify:
+            block_type = classify_block(
+                text=block.text,
+                bbox=tuple(block.bbox) if block.bbox else None,
+                page_height=page_height,
+                page_width=page_width
+            )
+        else:
+            block_type = 'paragraph'
+        
         page_blocks.append(PageBlock(
-            type='paragraph',  # PaddleOCR doesn't classify, default to paragraph
+            type=block_type,
             text=block.text,
             confidence=block.confidence,
             bbox=block.bbox
@@ -34,12 +54,20 @@ def normalize_paddle_output(blocks: List[OcrBlock]) -> List[PageBlock]:
     return page_blocks
 
 
-def normalize_tesseract_output(blocks: List[OcrBlock]) -> List[PageBlock]:
+def normalize_tesseract_output(
+    blocks: List[OcrBlock],
+    page_height: float = 0,
+    page_width: float = 0,
+    classify: bool = True
+) -> List[PageBlock]:
     """
     Normalize Tesseract blocks to PageBlock schema.
     
     Args:
         blocks: List of OcrBlock objects from Tesseract
+        page_height: Page height for position-based classification
+        page_width: Page width for position-based classification
+        classify: Whether to classify blocks (default True)
         
     Returns:
         List of PageBlock objects conforming to schema
@@ -47,8 +75,19 @@ def normalize_tesseract_output(blocks: List[OcrBlock]) -> List[PageBlock]:
     page_blocks = []
     
     for block in blocks:
+        # Determine block type
+        if classify:
+            block_type = classify_block(
+                text=block.text,
+                bbox=tuple(block.bbox) if block.bbox else None,
+                page_height=page_height,
+                page_width=page_width
+            )
+        else:
+            block_type = 'paragraph'
+        
         page_blocks.append(PageBlock(
-            type='paragraph',  # Tesseract doesn't classify, default to paragraph
+            type=block_type,
             text=block.text,
             confidence=block.confidence,
             bbox=block.bbox
@@ -68,7 +107,8 @@ def build_ocr_version(
     dpi_rerun: Optional[int] = None,
     bad_pages: Optional[List[int]] = None,
     fallback_pages: Optional[List[int]] = None,
-    warnings: Optional[List[str]] = None
+    warnings: Optional[List[str]] = None,
+    filter_doc_text: bool = True
 ) -> OcrVersion:
     """
     Build a complete OcrVersion object from processed pages.
@@ -85,6 +125,7 @@ def build_ocr_version(
         bad_pages: List of page numbers that needed reprocessing
         fallback_pages: List of page numbers that used Tesseract
         warnings: List of warning messages
+        filter_doc_text: If True, exclude non-core content from doc_text
         
     Returns:
         Complete OcrVersion object
@@ -102,14 +143,25 @@ def build_ocr_version(
     # Calculate average confidence
     avg_conf = sum(all_confidences) / len(all_confidences) if all_confidences else None
     
-    # Build doc_text with page separators
+    # Build doc_text - optionally filter to core content only
+    # Note: We don't include page separators anymore as they pollute RSVP reading
     doc_text_parts = []
     for page in pages:
-        doc_text_parts.append(f"\n\n--- Page {page.page} ---\n\n")
-        page_text = '\n'.join(block.text for block in page.blocks)
-        doc_text_parts.append(page_text)
+        page_blocks = []
+        for block in page.blocks:
+            # If filtering, only include core content types
+            if filter_doc_text:
+                if is_core_content(block.type):
+                    page_blocks.append(block.text)
+            else:
+                page_blocks.append(block.text)
+        
+        if page_blocks:
+            page_text = '\n'.join(page_blocks)
+            doc_text_parts.append(page_text)
     
-    doc_text = ''.join(doc_text_parts)
+    # Join pages with double newline (paragraph break)
+    doc_text = '\n\n'.join(doc_text_parts)
     
     # Build metrics
     metrics = OcrMetrics(
@@ -140,14 +192,21 @@ def build_ocr_version(
     )
 
 
-def merge_blocks_to_text(blocks: List[PageBlock]) -> str:
+def merge_blocks_to_text(
+    blocks: List[PageBlock],
+    core_only: bool = False
+) -> str:
     """
     Merge page blocks into a single text string.
     
     Args:
         blocks: List of PageBlock objects
+        core_only: If True, only include core content blocks
         
     Returns:
         Merged text
     """
+    if core_only:
+        filtered = [b for b in blocks if is_core_content(b.type)]
+        return '\n'.join(block.text for block in filtered)
     return '\n'.join(block.text for block in blocks)

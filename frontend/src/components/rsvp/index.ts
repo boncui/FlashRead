@@ -1,0 +1,60 @@
+export { RsvpPlayer } from './RsvpPlayer';
+export {
+  tokenize,
+  blocksToText,
+  getWordCount,
+  findParagraphStart,
+  createTokenBlockMapping,
+  findTokenIndexByBlockWord,
+  // New cadence model exports
+  isAbbreviation,
+  detectNumberType,
+  estimateSyllables,
+  computeTokenComplexity,
+  detectBoundaryType,
+  hasOpeningPunctuation,
+  hasClosingPunctuation,
+  hasDash,
+  isCodeLike,
+  hasMathSymbols,
+  type RsvpToken,
+  type TokenSourceMapping,
+  type BoundaryType,
+  type NumberType,
+} from './rsvpTokenizer';
+export { splitTokenForOrp, getOrpIndex, extractWordBody, getOrpCenterOffset } from './orp';
+export {
+  RsvpScheduler,
+  DEFAULT_TIMING_CONFIG,
+  getBaseInterval,
+  getTokenDuration,
+  getEstimatedDuration,
+  formatDuration,
+  // Cadence model exports
+  getLengthFactor,
+  getProsodyFactor,
+  getComplexityFactor,
+  getDomainFactor,
+  getBoundaryPause,
+  type RsvpTimingConfig,
+  type SchedulerTelemetry,
+  type WpmRampState,
+  type DomainMode,
+} from './timing';
+export { COMMON_WORDS_1K, COMMON_WORDS_5K, COMMON_WORDS_20K } from './wordFrequency';
+export {
+  RsvpTelemetryService,
+  DEFAULT_TELEMETRY_CONFIG,
+  type RsvpTelemetryConfig,
+  type RsvpTelemetryEvent,
+  type RsvpSessionStartEvent,
+  type RsvpSessionEndEvent,
+  type RsvpPauseEvent,
+  type RsvpSpeedChangeEvent,
+  type RsvpRewindEvent,
+  type RsvpTokenDisplayEvent,
+  type RsvpFrameJitterEvent,
+  type RsvpComprehensionProbe,
+  type RsvpEvent,
+  type RsvpSessionMetrics,
+} from './rsvpTelemetry';
