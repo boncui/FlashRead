@@ -119,6 +119,24 @@ export function RsvpSettingsCard() {
               formatValue={(v) => `${v.toFixed(1)}x`}
             />
             <SliderControl
+              label="Semicolon"
+              value={config.semicolonMultiplier}
+              min={0}
+              max={3}
+              step={0.1}
+              onChange={(v) => updateConfig('semicolonMultiplier', v)}
+              formatValue={(v) => `${v.toFixed(1)}x`}
+            />
+            <SliderControl
+              label="Colon"
+              value={config.colonMultiplier}
+              min={0}
+              max={3}
+              step={0.1}
+              onChange={(v) => updateConfig('colonMultiplier', v)}
+              formatValue={(v) => `${v.toFixed(1)}x`}
+            />
+            <SliderControl
               label="Period"
               value={config.periodMultiplier}
               min={0}
@@ -134,6 +152,15 @@ export function RsvpSettingsCard() {
               max={5}
               step={0.1}
               onChange={(v) => updateConfig('questionMultiplier', v)}
+              formatValue={(v) => `${v.toFixed(1)}x`}
+            />
+            <SliderControl
+              label="Exclamation"
+              value={config.exclamationMultiplier}
+              min={0}
+              max={5}
+              step={0.1}
+              onChange={(v) => updateConfig('exclamationMultiplier', v)}
               formatValue={(v) => `${v.toFixed(1)}x`}
             />
             <SliderControl
