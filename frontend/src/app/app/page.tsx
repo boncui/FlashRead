@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { createClient } from '@flashread/backend/supabase/server';
 import { getFlashreads } from '@flashread/backend/actions/flashreads';
 import { getDocuments } from '@flashread/backend/actions/documents';
 import { FlashreadCard } from '@/components/flashread-card';
@@ -6,6 +8,14 @@ import { DocumentCard } from '@/components/document-card';
 import { Button } from '@/components/ui/button';
 
 export default async function AppPage() {
+  // Check auth before fetching data to prevent server-side exceptions
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    redirect('/login');
+  }
+
   const [flashreads, documents] = await Promise.all([
     getFlashreads(),
     getDocuments(),
