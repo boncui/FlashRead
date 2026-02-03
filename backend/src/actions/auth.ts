@@ -87,7 +87,9 @@ export async function signUp(email: string, password: string) {
   if (error) {
     // Handle rate limit errors with a friendlier message
     if (error.message.toLowerCase().includes('rate limit')) {
-      return { error: 'Too many signup attempts. Please wait a minute and try again.' };
+      return { 
+        error: 'Email rate limit reached. Supabase limits signup emails - please wait 15-60 minutes or check your Supabase dashboard rate limit settings.' 
+      };
     }
     return { error: error.message };
   }
