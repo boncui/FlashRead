@@ -35,7 +35,7 @@ export default function LoginPage() {
         setLoading(false);
       } else if (result?.success) {
         // Check if email confirmation is required (signup flow)
-        if ('requiresConfirmation' in result && result.requiresConfirmation) {
+        if ('requiresConfirmation' in result && result.requiresConfirmation && 'message' in result) {
           setSuccessMessage(result.message as string);
           setLoading(false);
         } else {
