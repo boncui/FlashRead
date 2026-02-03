@@ -12,11 +12,13 @@ export default function LoginPage() {
   const router = useRouter();
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+    setSuccessMessage(null);
     setLoading(true);
 
     const formData = new FormData(e.currentTarget);
@@ -32,10 +34,19 @@ export default function LoginPage() {
         setError(result.error);
         setLoading(false);
       } else if (result?.success) {
-        router.push('/app');
+        // Check if email confirmation is required (signup flow)
+        if ('requiresConfirmation' in result && result.requiresConfirmation) {
+          setSuccessMessage(result.message as string);
+          setLoading(false);
+        } else {
+          // Redirect on successful auth
+          router.push('/app');
+          // Note: loading state stays true during redirect, which is intended UX
+        }
       }
     } catch (err) {
-      setError('An unexpected error occurred');
+      console.error('Auth error:', err);
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
       setLoading(false);
     }
   }
@@ -79,6 +90,11 @@ export default function LoginPage() {
                 {error}
               </div>
             )}
+            {successMessage && (
+              <div className="text-sm text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/30 p-3 rounded-md">
+                {successMessage}
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Sign In'}
             </Button>
@@ -89,6 +105,7 @@ export default function LoginPage() {
               onClick={() => {
                 setIsSignUp(!isSignUp);
                 setError(null);
+                setSuccessMessage(null);
               }}
               className="text-primary hover:underline"
               disabled={loading}
