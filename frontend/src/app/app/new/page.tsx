@@ -59,7 +59,7 @@ export default function NewFlashreadPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <h1 className="text-4xl font-bold mb-8">Create New FlashRead</h1>
+      <h1 className="text-2xl sm:text-4xl font-bold mb-8">Create New FlashRead</h1>
 
       <div className="space-y-6">
         {/* Mode Toggle */}
@@ -111,7 +111,7 @@ export default function NewFlashreadPage() {
                     placeholder="Paste your text here..."
                     value={sourceText}
                     onChange={(e) => setSourceText(e.target.value)}
-                    className="min-h-[300px]"
+                    className="min-h-[200px] sm:min-h-[300px]"
                     disabled={loading}
                   />
                 </div>

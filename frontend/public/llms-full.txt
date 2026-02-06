@@ -1,0 +1,97 @@
+# FlashRead – Full Technical Reference
+
+> Open-source speed reading tool that reformats dense academic text into clearer, less fatiguing layouts using RSVP, research-backed typography, and PDF OCR.
+
+## Product Overview
+
+FlashRead is a free, open-source web application for researchers, students, and power readers. It solves the problem of dense, hard-to-read academic text by reformatting it using two complementary modes:
+
+1. **Typography Mode** – Restructures raw text into optimally formatted blocks with heading detection, comfortable line widths, and reading-friendly spacing.
+2. **RSVP Mode** – Rapid Serial Visual Presentation displays one word at a time at a configurable pace, eliminating eye movement and enabling 2–3x faster reading.
+
+## RSVP Engine – Technical Details
+
+### Tokenizer
+- Splits text into display tokens preserving punctuation and whitespace semantics.
+- Handles hyphenated words, contractions, numbers, and special characters.
+- Produces metadata per token: syllable count, ORP position, timing weight.
+
+### Timing Model
+- Base pace set by user WPM (words per minute).
+- Per-word timing adjusted by:
+  - **Syllable count** – longer words get proportionally more display time
+  - **Word frequency** – rare words receive extra dwell time (uses frequency corpus)
+  - **Punctuation pauses** – periods, commas, semicolons, and paragraph breaks add calibrated delays
+  - **Cadence smoothing** – prevents jarring speed changes between consecutive tokens
+
+### ORP (Optimal Recognition Point)
+- Calculates the best fixation point for each word (typically 25–40% from the left).
+- The RSVP display aligns words so the ORP character sits at a fixed screen position, minimizing cognitive load.
+
+### Synced Text Panel
+- A paragraph-level view runs in parallel with the RSVP player.
+- The current word is highlighted in real-time so the reader always has context.
+- Clicking any word in the panel jumps the RSVP player to that position.
+
+## PDF & OCR Pipeline
+
+1. **Upload** – Files are stored in Supabase Storage with content-hash deduplication.
+2. **Direct text extraction** – Attempts to read embedded text layers from the PDF.
+3. **OCR fallback** – If direct extraction yields insufficient text, Tesseract OCR runs at adaptive DPI.
+4. **Confidence scoring** – Per-page confidence is measured; low-confidence pages are re-processed at higher DPI.
+5. **Output** – Clean text is stored in versioned OCR records with full metrics (runtime, char count, page count, confidence).
+
+## Architecture
+
+### Frontend (Next.js 15 App Router)
+- **Landing page** (`/`) – Public marketing page with interactive RSVP demo
+- **Login** (`/login`) – Email/password authentication
+- **Dashboard** (`/app`) – User's document library
+- **New FlashRead** (`/app/new`) – Text paste or PDF upload
+- **Reader** (`/app/[id]`) – Typography-formatted reading view with RSVP mode toggle
+- **Document viewer** (`/app/documents/[id]`) – PDF document detail with OCR status and FlashRead conversion
+- **Settings** (`/app/settings`) – Account and RSVP preferences
+
+### Backend (Supabase)
+- **Auth** – Email/password with Supabase Auth
+- **Database** – PostgreSQL with RLS policies
+- **Storage** – S3-compatible object storage for PDFs
+- **Server Actions** – Next.js server actions for mutations
+
+### Key Libraries
+- React 19, Next.js 15, TypeScript
+- Tailwind CSS + Radix UI primitives
+- Supabase JS client
+- Custom RSVP engine (no external dependencies)
+
+## API & Data Model
+
+### Public Routes
+- `GET /` – Landing page
+- `GET /login` – Authentication page
+
+### Authenticated Routes (behind Supabase Auth)
+- `GET /app` – Dashboard / library
+- `GET /app/new` – Create new FlashRead
+- `GET /app/[id]` – Read a FlashRead
+- `GET /app/documents/[id]` – View document details
+- `GET /app/settings` – User settings
+
+### Data Entities
+- **FlashRead** – title, source_text, rendered_blocks (formatted output)
+- **Document** – name, file_type, size_bytes, page_count, status, ocr_versions, derived_content
+- **OCR Version** – engine, version, doc_text, metrics (method, runtime, confidence, DPI)
+
+## Deployment
+
+- Frontend: Vercel (recommended) or any Node.js host
+- Backend: Supabase (hosted or self-hosted)
+- Environment variables: `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+## Links
+
+- Homepage: https://flashread.app
+- GitHub: https://github.com/boncui/FlashRead
+- Demo: https://www.youtube.com/watch?v=NdKcDPBQ-Lw
+- Author GitHub: https://github.com/boncui
+- Author LinkedIn: https://www.linkedin.com/in/boncui/

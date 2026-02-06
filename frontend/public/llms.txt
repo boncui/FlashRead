@@ -1,0 +1,39 @@
+# FlashRead
+
+> Open-source speed reading tool that reformats dense academic text into clearer, less fatiguing layouts using RSVP, research-backed typography, and PDF OCR.
+
+## About
+
+FlashRead is a free, open-source web application designed to help researchers, students, and avid readers consume dense text faster with less eye strain. It uses Rapid Serial Visual Presentation (RSVP) and typographic optimization grounded in reading science.
+
+## Core Features
+
+- **RSVP Speed Reading**: Displays words one at a time at adjustable WPM with cadence modeling based on word complexity, syllable count, and punctuation. Eliminates saccadic eye movement to boost reading speed 2–3x.
+- **Typography Optimization**: Automatic heading detection, optimal line lengths (45–75 characters), comfortable spacing, and bionic-style bold pivots for reduced eye strain.
+- **PDF OCR**: Upload scanned PDFs or images. A multi-engine OCR pipeline (direct text extraction → Tesseract fallback) converts them into clean, readable text.
+- **Synced Text Panel**: While RSVP plays, a synchronized paragraph view highlights the current word in context so readers never lose their place.
+- **Document Library**: Authenticated users can save, organize, and revisit their reading materials.
+
+## How It Works
+
+1. **Upload** – Paste text, upload a PDF, or let OCR extract content from scanned pages.
+2. **Choose a Mode** – Select typography mode for comfortable reading or RSVP mode for speed reading.
+3. **Read** – Enjoy optimized text presentation that reduces fatigue and improves focus.
+
+## Technical Details
+
+- **Frontend**: Next.js 15 (App Router), React 19, Tailwind CSS, TypeScript
+- **Backend**: Supabase (Auth, Database, Storage), Server Actions
+- **OCR**: Multi-engine pipeline with confidence scoring and DPI scaling
+- **RSVP Engine**: Custom tokenizer with syllable-aware timing, ORP (Optimal Recognition Point) calculation, word-frequency weighting, and punctuation-aware pauses
+
+## Links
+
+- Homepage: https://flashread.app
+- GitHub: https://github.com/boncui/FlashRead
+- Demo video: https://www.youtube.com/watch?v=NdKcDPBQ-Lw
+
+## Contact
+
+- GitHub: https://github.com/boncui
+- LinkedIn: https://www.linkedin.com/in/boncui/

@@ -47,8 +47,8 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="container mx-auto max-w-2xl py-8 px-4">
-      <h1 className="text-3xl font-bold mb-8">Account Settings</h1>
+    <div className="container mx-auto max-w-2xl py-4 sm:py-8 px-4">
+      <h1 className="text-2xl sm:text-3xl font-bold mb-8">Account Settings</h1>
 
       <div className="space-y-6">
         {/* RSVP Settings */}

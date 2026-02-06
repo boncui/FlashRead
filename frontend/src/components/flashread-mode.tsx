@@ -117,7 +117,7 @@ export function FlashReadMode({ blocks, title, onExit, documentId }: FlashReadMo
   return (
     <div className="fixed inset-0 z-50 bg-background flex flex-col">
       {/* Top bar with WPM and controls */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border/50">
+      <div className="flex items-center justify-between px-3 py-3 sm:px-6 sm:py-4 border-b border-border/50">
         {/* WPM Display - Top Left */}
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 bg-muted px-4 py-2 rounded-lg">
@@ -227,7 +227,7 @@ export function FlashReadMode({ blocks, title, onExit, documentId }: FlashReadMo
       )}
 
       {/* Bottom progress bar */}
-      <div className="border-t border-border/50 px-6 py-4">
+      <div className="border-t border-border/50 px-3 py-3 sm:px-6 sm:py-4">
         <div className="flex items-center gap-4">
           {/* Play/Pause button */}
           <button
@@ -260,7 +260,7 @@ export function FlashReadMode({ blocks, title, onExit, documentId }: FlashReadMo
         </div>
 
         {/* Instructions */}
-        <div className="flex items-center justify-center gap-6 mt-3 text-xs text-muted-foreground">
+        <div className="hidden sm:flex items-center justify-center gap-6 mt-3 text-xs text-muted-foreground">
           <span>
             <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">Space</kbd> Play/Pause
           </span>

@@ -39,8 +39,8 @@ export default async function AppPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-4xl font-bold">Your Library</h1>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+        <h1 className="text-2xl sm:text-4xl font-bold">Your Library</h1>
         <Link href="/app/new">
           <Button>New FlashRead</Button>
         </Link>

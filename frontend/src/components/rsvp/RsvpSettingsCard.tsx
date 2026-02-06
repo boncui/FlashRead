@@ -339,7 +339,7 @@ function SliderControl({
           step={step}
           value={value}
           onChange={(e) => onChange(parseFloat(e.target.value))}
-          className="w-24 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer
+          className="w-20 sm:w-24 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer
             [&::-webkit-slider-thumb]:appearance-none
             [&::-webkit-slider-thumb]:w-4
             [&::-webkit-slider-thumb]:h-4
@@ -353,7 +353,7 @@ function SliderControl({
             [&::-moz-range-thumb]:border-0
             [&::-moz-range-thumb]:cursor-pointer"
         />
-        <span className="text-sm text-muted-foreground w-16 text-right tabular-nums">
+        <span className="text-sm text-muted-foreground w-14 sm:w-16 text-right tabular-nums">
           {formatValue(value)}
         </span>
       </div>

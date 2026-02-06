@@ -57,7 +57,8 @@ export const SyncedTextPanel = forwardRef<HTMLDivElement, SyncedTextPanelProps>(
         const wordRect = word.getBoundingClientRect();
         
         // Calculate if the word is outside the visible area (with some padding)
-        const padding = 100; // pixels of padding from edges
+        // Use smaller padding on mobile devices
+        const padding = typeof window !== 'undefined' && window.innerWidth < 640 ? 50 : 100;
         const isAboveView = wordRect.top < containerRect.top + padding;
         const isBelowView = wordRect.bottom > containerRect.bottom - padding;
         

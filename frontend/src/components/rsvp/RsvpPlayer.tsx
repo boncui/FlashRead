@@ -601,7 +601,7 @@ export function RsvpPlayer({
         ref={textPanelRef}
         data-controls
         className={cn(
-          'absolute top-0 left-0 h-full w-80 sm:w-96 overflow-hidden bg-zinc-900/95 backdrop-blur-sm border-r border-white/10 z-20 transition-transform duration-300 ease-in-out',
+          'absolute top-0 left-0 h-full w-full sm:w-96 overflow-hidden bg-zinc-900/95 backdrop-blur-sm border-r border-white/10 z-20 transition-transform duration-300 ease-in-out',
           showTextPanel ? 'translate-x-0' : '-translate-x-full'
         )}
         onClick={(e) => e.stopPropagation()}
@@ -642,7 +642,7 @@ export function RsvpPlayer({
       <div
         data-controls
         className={cn(
-          'absolute top-0 right-0 h-full w-80 sm:w-96 overflow-hidden bg-zinc-900/95 backdrop-blur-sm border-l border-white/10 z-20 transition-transform duration-300 ease-in-out',
+          'absolute top-0 right-0 h-full w-full sm:w-96 overflow-hidden bg-zinc-900/95 backdrop-blur-sm border-l border-white/10 z-20 transition-transform duration-300 ease-in-out',
           showSettingsPanel ? 'translate-x-0' : 'translate-x-full'
         )}
         onClick={(e) => e.stopPropagation()}
@@ -706,14 +706,14 @@ export function RsvpPlayer({
       </div>
 
       {/* WPM display - bottom right (always visible) */}
-      <div className="absolute bottom-6 right-6 text-white/40 text-sm italic font-light">
+      <div className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 text-white/40 text-sm italic font-light">
         {wpm} wpm
       </div>
 
       {/* WPM change indicator - prominent center bottom */}
       <div
         className={cn(
-          'absolute bottom-32 left-1/2 -translate-x-1/2 px-6 py-3 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20 transition-all duration-300 pointer-events-none',
+          'absolute bottom-24 sm:bottom-32 left-1/2 -translate-x-1/2 px-6 py-3 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20 transition-all duration-300 pointer-events-none',
           showWpmIndicator
             ? 'opacity-100 translate-y-0'
             : 'opacity-0 translate-y-4'
@@ -724,12 +724,12 @@ export function RsvpPlayer({
       </div>
 
       {/* Badges - top right */}
-      <div className="absolute top-4 right-4 flex items-center gap-2">
+      <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex items-center gap-2">
         {isFilteringContent && (
           <button
             data-controls
             onClick={() => setShowTextPanel(true)}
-            className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs font-medium rounded border border-blue-500/30 hover:bg-blue-500/30 transition-colors"
+            className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs font-medium rounded border border-blue-500/30 hover:bg-blue-500/30 transition-colors min-h-[44px] flex items-center"
             title="Content filtered - click to configure"
           >
             <FilterIcon className="w-3 h-3 inline mr-1" />
@@ -742,7 +742,7 @@ export function RsvpPlayer({
         <button
           data-controls
           onClick={() => setShowWarning(true)}
-          className="text-white/40 hover:text-white/60 transition-colors"
+          className="text-white/40 hover:text-white/60 transition-colors p-2.5 sm:p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
           title="About RSVP"
         >
           <InfoIcon className="w-4 h-4" />
@@ -750,11 +750,11 @@ export function RsvpPlayer({
       </div>
 
       {/* Top left controls */}
-      <div className="absolute top-4 left-4 flex items-center gap-2">
+      <div className="absolute top-3 left-3 sm:top-4 sm:left-4 flex items-center gap-2">
         <button
           data-controls
           onClick={handleStop}
-          className="p-2 text-white/40 hover:text-white/80 transition-colors"
+          className="p-2.5 sm:p-2 text-white/40 hover:text-white/80 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
           title="Exit (Esc)"
         >
           <CloseIcon className="w-5 h-5" />
@@ -763,7 +763,7 @@ export function RsvpPlayer({
           data-controls
           onClick={() => setShowTextPanel((p) => !p)}
           className={cn(
-            'p-2 transition-colors',
+            'p-2.5 sm:p-2 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center',
             showTextPanel
               ? 'text-white/80 bg-white/10 rounded'
               : 'text-white/40 hover:text-white/80'
@@ -776,7 +776,7 @@ export function RsvpPlayer({
           data-controls
           onClick={() => setShowSettingsPanel((p) => !p)}
           className={cn(
-            'p-2 transition-colors',
+            'p-2.5 sm:p-2 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center',
             showSettingsPanel
               ? 'text-white/80 bg-white/10 rounded'
               : 'text-white/40 hover:text-white/80'
@@ -791,7 +791,7 @@ export function RsvpPlayer({
       <div
         data-controls
         className={cn(
-          'absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300',
+          'absolute bottom-0 left-0 right-0 p-3 sm:p-6 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300',
           showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
         )}
       >
@@ -806,60 +806,64 @@ export function RsvpPlayer({
           />
         </div>
 
-        <div className="flex items-center justify-between gap-4">
-          {/* Left: Play/Pause + Word count */}
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setIsPlaying((p) => !p)}
-              className="p-3 bg-white/10 rounded-full hover:bg-white/20 transition-colors"
-              title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
-            >
-              {isPlaying ? (
-                <PauseIcon className="w-6 h-6 text-white" />
+        {/* Mobile: Stacked layout, Desktop: Horizontal layout */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+          {/* Row 1 on mobile: Play/Pause + Word count + WPM control */}
+          <div className="flex items-center justify-between sm:justify-start gap-3 sm:gap-4">
+            {/* Play/Pause + Word count */}
+            <div className="flex items-center gap-3 sm:gap-4">
+              <button
+                onClick={() => setIsPlaying((p) => !p)}
+                className="p-3 bg-white/10 rounded-full hover:bg-white/20 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+              >
+                {isPlaying ? (
+                  <PauseIcon className="w-6 h-6 text-white" />
+                ) : (
+                  <PlayIcon className="w-6 h-6 text-white" />
+                )}
+              </button>
+              <div className="text-white/50 text-sm">
+                {currentIndex + 1} / {tokens.length}
+              </div>
+            </div>
+
+            {/* WPM control - centered on desktop, right-aligned on mobile */}
+            <div className="flex items-center justify-center sm:flex-1">
+              {isEditingWpm ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={wpmInputRef}
+                    type="text"
+                    inputMode="numeric"
+                    value={editWpmValue}
+                    onChange={handleWpmInputChange}
+                    onKeyDown={handleWpmInputKeyDown}
+                    onBlur={handleWpmInputBlur}
+                    className="w-20 px-2 py-1 bg-white/10 border border-white/30 rounded text-white text-center text-lg font-semibold tabular-nums focus:outline-none focus:border-white/50"
+                    autoFocus
+                  />
+                  <span className="text-white/50 text-sm">WPM</span>
+                </div>
               ) : (
-                <PlayIcon className="w-6 h-6 text-white" />
+                <div
+                  onPointerDown={handleWpmPointerDown}
+                  onPointerMove={handleWpmPointerMove}
+                  onPointerUp={handleWpmPointerUp}
+                  className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg cursor-ew-resize select-none transition-colors touch-none"
+                  title="Drag to adjust or click to type exact value"
+                >
+                  <span className="text-white text-lg font-semibold tabular-nums">{wpm}</span>
+                  <span className="text-white/50 text-sm">WPM</span>
+                  {/* Drag hint arrows */}
+                  <span className="text-white/30 text-xs ml-1">◀▶</span>
+                </div>
               )}
-            </button>
-            <div className="text-white/50 text-sm">
-              {currentIndex + 1} / {tokens.length}
             </div>
           </div>
 
-          {/* Center: Draggable WPM control */}
-          <div className="flex items-center justify-center flex-1">
-            {isEditingWpm ? (
-              <div className="flex items-center gap-2">
-                <input
-                  ref={wpmInputRef}
-                  type="text"
-                  inputMode="numeric"
-                  value={editWpmValue}
-                  onChange={handleWpmInputChange}
-                  onKeyDown={handleWpmInputKeyDown}
-                  onBlur={handleWpmInputBlur}
-                  className="w-20 px-2 py-1 bg-white/10 border border-white/30 rounded text-white text-center text-lg font-semibold tabular-nums focus:outline-none focus:border-white/50"
-                  autoFocus
-                />
-                <span className="text-white/50 text-sm">WPM</span>
-              </div>
-            ) : (
-              <div
-                onPointerDown={handleWpmPointerDown}
-                onPointerMove={handleWpmPointerMove}
-                onPointerUp={handleWpmPointerUp}
-                className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg cursor-ew-resize select-none transition-colors touch-none"
-                title="Drag to adjust or click to type exact value"
-              >
-                <span className="text-white text-lg font-semibold tabular-nums">{wpm}</span>
-                <span className="text-white/50 text-sm">WPM</span>
-                {/* Drag hint arrows */}
-                <span className="text-white/30 text-xs ml-1">◀▶</span>
-              </div>
-            )}
-          </div>
-
-          {/* Right: Estimated time + Restart */}
-          <div className="flex items-center gap-4">
+          {/* Row 2 on mobile: Time + Restart (hidden on mobile, shown on desktop in original position) */}
+          <div className="hidden sm:flex items-center gap-4">
             <span className="text-white/40 text-sm">
               ~{formatDuration(estimatedDuration)}
             </span>
@@ -871,10 +875,24 @@ export function RsvpPlayer({
               <RestartIcon className="w-5 h-5" />
             </button>
           </div>
+
+          {/* Mobile: Time + Restart in separate row */}
+          <div className="flex sm:hidden items-center justify-between">
+            <span className="text-white/40 text-sm">
+              ~{formatDuration(estimatedDuration)}
+            </span>
+            <button
+              onClick={handleRestart}
+              className="p-2 text-white/40 hover:text-white/80 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+              title="Restart (R)"
+            >
+              <RestartIcon className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
-        {/* Keyboard shortcuts hint */}
-        <div className="flex items-center justify-center gap-4 mt-3 text-xs text-white/30 flex-wrap">
+        {/* Keyboard shortcuts hint - hidden on mobile */}
+        <div className="hidden sm:flex items-center justify-center gap-4 mt-3 text-xs text-white/30 flex-wrap">
           <span>
             <kbd className="px-1.5 py-0.5 bg-white/10 rounded font-mono text-[10px]">Space</kbd>{' '}
             Play/Pause
