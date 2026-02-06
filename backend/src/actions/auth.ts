@@ -79,7 +79,7 @@ export async function signUp(email: string, password: string) {
 
   const supabase = await createClient();
 
-  const { data, error } = await supabase.auth.signUp({
+  const { error } = await supabase.auth.signUp({
     email,
     password,
   });
@@ -92,16 +92,6 @@ export async function signUp(email: string, password: string) {
       };
     }
     return { error: error.message };
-  }
-
-  // Check if email confirmation is required
-  // When user exists but no session, email confirmation is pending
-  if (data.user && !data.session) {
-    return {
-      success: true,
-      requiresConfirmation: true,
-      message: 'Please check your email to confirm your account before signing in.',
-    };
   }
 
   revalidatePath('/', 'layout');
